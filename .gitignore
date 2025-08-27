@@ -1,9 +1,6 @@
 node_modules/
-out/
 .vscode/
-*.vsix
 *.log
-dist/
 coverage/
 .DS_Store
 .env*
