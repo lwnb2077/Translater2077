@@ -154,7 +154,8 @@ export class SettingsPanel {
                 deepl: config.get('deeplApiKey', ''),
                 microsoft: config.get('microsoftApiKey', ''),
                 openai: config.get('openaiApiKey', ''),
-                gemini: config.get('geminiApiKey', '')
+                gemini: config.get('geminiApiKey', ''),
+                deepseek: config.get('deepseekApiKey', '')
             },
             // 扩展提供商参数
             microsoftRegion: config.get('microsoftRegion', 'global')
@@ -490,10 +491,11 @@ export class SettingsPanel {
                 <label for="apiProvider" data-i18n="providerLabel">翻译服务提供商：</label>
                 <select id="apiProvider">
                     <option value="google" data-i18n="provider.google">Google Translate</option>
+                    <option value="deepl" data-i18n="provider.deepl">DeepL</option>
                     <option value="microsoft" data-i18n="provider.microsoft">微软翻译</option>
-                    
                     <option value="openai" data-i18n="provider.openai">OpenAI (GPT‑4o mini)</option>
                     <option value="gemini" data-i18n="provider.gemini">Google Gemini (2.5 Flash)</option>
+                    <option value="deepseek" data-i18n="provider.deepseek">DeepSeek v3.1</option>
                 </select>
                 <div class="provider-info" id="providerInfo"></div>
             </div>
@@ -505,6 +507,16 @@ export class SettingsPanel {
                     <input type="text" id="googleApiKey" data-placeholder-i18n="googleApiKeyPlaceholder">
                     <button type="button" class="secondary test-btn" data-provider="google" data-i18n="testConnection">测试连接</button>
                 </div>
+            </div>
+            
+            <!-- DeepL API Key -->
+            <div class="form-group api-key-section hidden" id="deeplSection">
+                <label for="deeplApiKey" data-i18n="deeplApiKey">DeepL API Key：</label>
+                <div class="api-key-group">
+                    <input type="text" id="deeplApiKey" data-placeholder-i18n="deeplApiKeyPlaceholder">
+                    <button type="button" class="secondary test-btn" data-provider="deepl" data-i18n="testConnection">测试连接</button>
+                </div>
+                <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="deeplNotes">支持免费版（API Key以':fx'结尾）和专业版，高质量翻译服务。</p>
             </div>
             
             <!-- Microsoft API Key -->
@@ -534,6 +546,16 @@ export class SettingsPanel {
                     <button type="button" class="secondary test-btn" data-provider="gemini" data-i18n="testConnection">测试连接</button>
                 </div>
                 <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="geminiNotes">需要在 Google AI Studio 申请 API Key；部分地区不可用或需代理，计费与配额以官方为准。</p>
+            </div>
+            
+            <!-- DeepSeek API Key -->
+            <div class="form-group api-key-section hidden" id="deepseekSection">
+                <label for="deepseekApiKey" data-i18n="deepseekApiKey">DeepSeek API Key：</label>
+                <div class="api-key-group">
+                    <input type="text" id="deepseekApiKey" data-placeholder-i18n="deepseekApiKeyPlaceholder">
+                    <button type="button" class="secondary test-btn" data-provider="deepseek" data-i18n="testConnection">测试连接</button>
+                </div>
+                <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="deepseekNotes">强大的语言模型翻译服务，使用deepseek-chat模型，需要API Key。</p>
             </div>
             
             </div>
@@ -673,13 +695,13 @@ export class SettingsPanel {
                 <div class="form-group">
                     <label data-i18n="tooltipOptimizationLabel">Tooltip显示延迟优化：</label>
                     <p style="color: var(--vscode-descriptionForeground); font-size: 14px; margin-bottom: 10px;" data-i18n="tooltipOptimizationDesc">
-                        VSCode默认tooltip延迟约1000毫秒，建议设置为100-200毫秒以获得更好的使用体验。
+                        VSCode默认tooltip延迟约1000毫秒，建议设置为50-200毫秒以获得更好的使用体验。
                     </p>
                     <button type="button" class="secondary" id="openTooltipBtn" style="margin-bottom: 10px;" data-i18n="openTooltipSettings">
                         打开VSCode Tooltip延迟设置
                     </button>
                     <p style="color: var(--vscode-descriptionForeground); font-size: 12px;" data-i18n="tooltipRecommendation">
-                        建议设置值：workbench.hover.delay: 150
+                        建议设置值：workbench.hover.delay: 100
                     </p>
                 </div>
             </div>
@@ -698,9 +720,11 @@ export class SettingsPanel {
                 apiSettings: "🔑 翻译API设置",
                 providerLabel: "翻译服务提供商：",
                 "provider.google": "Google Translate",
+                "provider.deepl": "DeepL",
                 "provider.microsoft": "微软翻译",
                 "provider.openai": "OpenAI (GPT‑4o mini)",
                 "provider.gemini": "Google Gemini (2.5 Flash)",
+                "provider.deepseek": "DeepSeek v3.1",
                 googleApiKey: "Google Translate API Key：",
                 googleApiKeyPlaceholder: "输入您的Google API密钥（可选，不填使用免费服务）",
                 microsoftApiKey: "微软翻译API密钥：",
@@ -708,10 +732,16 @@ export class SettingsPanel {
                 testConnection: "测试连接",
                 openaiApiKey: "OpenAI API Key：",
                 openaiApiKeyPlaceholder: "输入 OpenAI API Key（用于 GPT‑4o mini）",
+                deeplApiKey: "DeepL API Key：",
+                deeplApiKeyPlaceholder: "输入DeepL API Key（免费版以':fx'结尾）",
                 geminiApiKey: "Google AI Studio API Key：",
                 geminiApiKeyPlaceholder: "输入 Google AI Studio API Key（用于 Gemini 2.5 Flash）",
+                deepseekApiKey: "DeepSeek API Key：",
+                deepseekApiKeyPlaceholder: "输入DeepSeek API Key",
+                deeplNotes: "支持免费版（API Key以':fx'结尾）和专业版，高质量翻译服务。",
                 openaiNotes: "需要有效的 OpenAI 账号与 API Key，计费按使用量收取；部分地区可能无法直连，需配置代理。",
                 geminiNotes: "需要在 Google AI Studio 申请 API Key；部分地区不可用或需代理，计费与配额以官方为准。",
+                deepseekNotes: "强大的语言模型翻译服务，使用deepseek-chat模型，需要API Key。",
                 languageSettings: "🌍 语言设置",
                 sourceLanguageLabel: "源语言（自动检测推荐）：",
                 targetLanguageLabel: "目标语言：",
@@ -736,9 +766,9 @@ export class SettingsPanel {
                 autoHideDelayLabel: "翻译结果自动消失延迟时间（秒）：",
                 vscodeSettings: "🔧 VSCode全局设置优化",
                 tooltipOptimizationLabel: "Tooltip显示延迟优化：",
-                tooltipOptimizationDesc: "VSCode默认tooltip延迟约1000毫秒，建议设置为100-200毫秒以获得更好的使用体验。",
+                tooltipOptimizationDesc: "VSCode默认tooltip延迟约1000毫秒，建议设置为50-200毫秒以获得更好的使用体验。",
                 openTooltipSettings: "🚀 打开VSCode Tooltip延迟设置",
-                tooltipRecommendation: "建议设置值：workbench.hover.delay: 150",
+                tooltipRecommendation: "建议设置值：workbench.hover.delay: 100",
                 saveSettings: "保存设置",
                 settingsSavedSuccess: "设置已保存",
                 settingsSavedFailed: "设置保存失败",
@@ -771,9 +801,11 @@ export class SettingsPanel {
                 apiSettings: "🔑 Translation API Settings",
                 providerLabel: "Translation Service Provider:",
                 "provider.google": "Google Translate",
+                "provider.deepl": "DeepL",
                 "provider.microsoft": "Microsoft Translator",
                 "provider.openai": "OpenAI (GPT‑4o mini)",
                 "provider.gemini": "Google Gemini (2.5 Flash)",
+                "provider.deepseek": "DeepSeek v3.1",
                 googleApiKey: "Google Translate API Key:",
                 googleApiKeyPlaceholder: "Enter your Google API key (optional, uses free service if empty)",
                 microsoftApiKey: "Microsoft Translator API Key:",
@@ -781,10 +813,16 @@ export class SettingsPanel {
                 testConnection: "Test Connection",
                 openaiApiKey: "OpenAI API Key:",
                 openaiApiKeyPlaceholder: "Enter OpenAI API Key (for GPT‑4o mini)",
+                deeplApiKey: "DeepL API Key:",
+                deeplApiKeyPlaceholder: "Enter DeepL API Key (free version ends with ':fx')",
                 geminiApiKey: "Google AI Studio API Key:",
                 geminiApiKeyPlaceholder: "Enter Google AI Studio API Key (for Gemini 2.5 Flash)",
+                deepseekApiKey: "DeepSeek API Key:",
+                deepseekApiKeyPlaceholder: "Enter DeepSeek API Key",
+                deeplNotes: "Supports both free version (API key ends with ':fx') and professional version, high-quality translation service.",
                 openaiNotes: "OpenAI account and API key required; usage-based billing; proxy may be required in some regions.",
                 geminiNotes: "API key from Google AI Studio required; availability and quotas vary by region; proxy may be needed.",
+                deepseekNotes: "Powerful language model translation service using deepseek-chat model, API key required.",
                 languageSettings: "🌍 Language Settings",
                 sourceLanguageLabel: "Source Language (Auto-detect recommended):",
                 targetLanguageLabel: "Target Language:",
@@ -809,9 +847,9 @@ export class SettingsPanel {
                 autoHideDelayLabel: "Auto-hide delay time (seconds):",
                 vscodeSettings: "🔧 VSCode Global Settings Optimization",
                 tooltipOptimizationLabel: "Tooltip Display Delay Optimization:",
-                tooltipOptimizationDesc: "VSCode default tooltip delay is about 1000ms, recommend setting to 100-200ms for better user experience.",
+                tooltipOptimizationDesc: "VSCode default tooltip delay is about 1000ms, recommend setting to 50-200ms for better user experience.",
                 openTooltipSettings: "🚀 Open VSCode Tooltip Delay Settings",
-                tooltipRecommendation: "Recommended setting: workbench.hover.delay: 150",
+                tooltipRecommendation: "Recommended setting: workbench.hover.delay: 100",
                 saveSettings: "Save Settings",
                 settingsSavedSuccess: "Settings saved",
                 settingsSavedFailed: "Failed to save settings",
@@ -844,20 +882,28 @@ export class SettingsPanel {
                 apiSettings: "🔑 翻訳API設定",
                 providerLabel: "翻訳サービスプロバイダー：",
                 "provider.google": "Google翻訳",
+                "provider.deepl": "DeepL",
                 "provider.microsoft": "Microsoft翻訳",
                 "provider.openai": "OpenAI (GPT‑4o mini)",
                 "provider.gemini": "Google Gemini (2.5 Flash)",
+                "provider.deepseek": "DeepSeek v3.1",
                 googleApiKey: "Google翻訳APIキー：",
                 googleApiKeyPlaceholder: "GoogleのAPIキーを入力（オプション、空の場合無料サービスを使用）",
                 microsoftApiKey: "Microsoft翻訳APIキー：",
                 microsoftApiKeyPlaceholder: "Microsoft翻訳のAPIキーを入力",
                 testConnection: "接続テスト",
+                deeplApiKey: "DeepL APIキー：",
+                deeplApiKeyPlaceholder: "DeepL APIキーを入力（無料版は':fx'で終了）",
                 openaiApiKey: "OpenAI APIキー：",
                 openaiApiKeyPlaceholder: "OpenAIのAPIキーを入力（GPT‑4o mini 用）",
                 geminiApiKey: "Google AI Studio APIキー：",
                 geminiApiKeyPlaceholder: "Google AI Studio の APIキーを入力（Gemini 2.5 Flash 用）",
+                deepseekApiKey: "DeepSeek APIキー：",
+                deepseekApiKeyPlaceholder: "DeepSeek APIキーを入力",
+                deeplNotes: "無料版（APIキーが':fx'で終わる）とプロ版をサポート、高品質翻訳サービス。",
                 openaiNotes: "OpenAIのアカウントとAPIキーが必要です。従量課金。地域によりプロキシが必要な場合があります。",
                 geminiNotes: "Google AI Studio でAPIキーが必要です。地域により利用不可/プロキシが必要な場合があります。",
+                deepseekNotes: "deepseek-chatモデルを使用した強力な言語モデル翻訳サービス、APIキーが必要。",
                 languageSettings: "🌍 言語設定",
                 sourceLanguageLabel: "ソース言語（自動検出推奨）：",
                 targetLanguageLabel: "ターゲット言語：",
@@ -882,9 +928,9 @@ export class SettingsPanel {
                 autoHideDelayLabel: "自動非表示遅延時間（秒）：",
                 vscodeSettings: "🔧 VSCodeグローバル設定最適化",
                 tooltipOptimizationLabel: "ツールチップ表示遅延最適化：",
-                tooltipOptimizationDesc: "VSCodeのデフォルトツールチップ遅延は約1000msです。より良いユーザー体験のために100-200msに設定することをお勧めします。",
+                tooltipOptimizationDesc: "VSCodeのデフォルトツールチップ遅延は約1000msです。より良いユーザー体験のために50-200msに設定することをお勧めします。",
                 openTooltipSettings: "🚀 VSCodeツールチップ遅延設定を開く",
-                tooltipRecommendation: "推奨設定：workbench.hover.delay: 150",
+                tooltipRecommendation: "推奨設定：workbench.hover.delay: 100",
                 saveSettings: "設定を保存",
                 settingsSavedSuccess: "設定を保存しました",
                 settingsSavedFailed: "設定の保存に失敗しました",
@@ -1000,21 +1046,27 @@ export class SettingsPanel {
         const providerInfoData = {
             zh: {
                 google: "支持100多种语言，免费版有配额限制",
+                deepl: "DeepL高质量翻译，支持免费版和专业版",
                 microsoft: "微软翻译，支持60多种语言，需要Azure订阅",
                 openai: "OpenAI (GPT‑4o mini)，需要有效的 OpenAI 账号与 API Key，计费按使用量收取；部分地区可能无法直连，需配置代理。",
-                gemini: "Google Gemini (2.5 Flash)，需要在 Google AI Studio 申请 API Key；部分地区不可用或需代理，计费与配额以官方为准。"
+                gemini: "Google Gemini (2.5 Flash)，需要在 Google AI Studio 申请 API Key；部分地区不可用或需代理，计费与配额以官方为准。",
+                deepseek: "DeepSeek v3.1强大语言模型翻译，使用deepseek-chat模型，需要API Key。"
             },
             en: {
                 google: "Supports 100+ languages, free version has quota limits",
+                deepl: "DeepL high-quality translation, supports free and professional versions",
                 microsoft: "Microsoft Translator, supports 60+ languages, requires Azure subscription",
                 openai: "OpenAI (GPT‑4o mini), requires a valid OpenAI account and API key, billed based on usage; some regions may not be directly accessible, requiring proxy configuration.",
-                gemini: "Google Gemini (2.5 Flash), requires API key from Google AI Studio; some regions may be unavailable or require proxy, with fees and quotas subject to official documentation."
+                gemini: "Google Gemini (2.5 Flash), requires API key from Google AI Studio; some regions may be unavailable or require proxy, with fees and quotas subject to official documentation.",
+                deepseek: "DeepSeek v3.1 powerful language model translation using deepseek-chat model, API key required."
             },
             ja: {
                 google: "100以上の言語をサポート、無料版には制限あり",
+                deepl: "DeepL高品質翻訳、無料版とプロ版をサポート",
                 microsoft: "Microsoft翻訳、60以上の言語をサポート、Azureサブスクリプションが必要",
                 openai: "OpenAI (GPT‑4o mini)，OpenAIのアカウントとAPIキーが必要です。従量課金。地域によりプロキシが必要な場合があります。",
-                gemini: "Google Gemini (2.5 Flash)，Google AI Studio でAPIキーが必要です。地域により利用不可/プロキシが必要な場合があります。"
+                gemini: "Google Gemini (2.5 Flash)，Google AI Studio でAPIキーが必要です。地域により利用不可/プロキシが必要な場合があります。",
+                deepseek: "DeepSeek v3.1強力な言語モデル翻訳、deepseek-chatモデルを使用、APIキーが必要。"
             }
         };
         
@@ -1174,7 +1226,8 @@ export class SettingsPanel {
                     deepl: document.getElementById('deeplApiKey')?.value || '',
                     microsoft: document.getElementById('microsoftApiKey').value,
                     openai: document.getElementById('openaiApiKey').value,
-                    gemini: document.getElementById('geminiApiKey').value
+                    gemini: document.getElementById('geminiApiKey').value,
+                    deepseek: document.getElementById('deepseekApiKey').value
                 },
                 // 扩展的提供商参数
                 microsoftRegion: document.getElementById('microsoftRegion')?.value || ''

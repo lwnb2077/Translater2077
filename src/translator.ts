@@ -395,6 +395,70 @@ export class DeepLTranslator {
         }
     }
 }
+// DeepSeek 翻译器
+export class DeepSeekTranslator {
+    name = 'deepseek';
+    private apiKey: string;
+    private baseUrl = 'https://api.deepseek.com/v1/chat/completions';
+    private model = 'deepseek-chat';
+    
+    constructor(apiKey?: string) {
+        this.apiKey = apiKey || '';
+    }
+    
+    async translate(text: string, targetLang: string = 'zh-CN', sourceLang: string = 'auto'): Promise<string> {
+        if (!this.apiKey) throw new Error('DeepSeek 需要 API Key');
+        
+        const system = `You are a professional translator. Translate the user's text into ${targetLang}. Keep meaning accurate; keep code blocks unchanged. Only return the translated text without any explanation.`;
+        
+        try {
+            const response = await axios.post(this.baseUrl, {
+                model: this.model,
+                messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: text }
+                ],
+                temperature: 0.2,
+                max_tokens: 2048
+            }, {
+                headers: { 'Authorization': `Bearer ${this.apiKey}` }
+            });
+            
+            const result = response.data?.choices?.[0]?.message?.content;
+            if (!result) throw new Error('DeepSeek 返回为空');
+            return result;
+        } catch (error: any) {
+            if (error.response?.status === 401) {
+                throw new Error('DeepSeek API Key 无效');
+            }
+            if (error.response?.status === 429) {
+                throw new Error('DeepSeek API 请求频率限制');
+            }
+            throw new Error(`DeepSeek 翻译失败: ${error.message}`);
+        }
+    }
+    
+    async testConnection(): Promise<boolean> {
+        try {
+            if (!this.apiKey) return false;
+            
+            const response = await axios.post(this.baseUrl, {
+                model: this.model,
+                messages: [
+                    { role: 'user', content: 'test' }
+                ],
+                max_tokens: 10
+            }, {
+                headers: { 'Authorization': `Bearer ${this.apiKey}` }
+            });
+            
+            return !!(response.status >= 200 && response.status < 300);
+        } catch {
+            return false;
+        }
+    }
+}
+
 // 编程术语词典
 export class CodeTermDictionary {
     // multi-language glossary; default zh-CN

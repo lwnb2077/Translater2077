@@ -137,6 +137,7 @@ const UI_TEXT: Record<string, UiStrings> = {
     closeBtn: '關閉',
     offlineNotice: '目前為本機詞典模式，結果可能不完整（網路不可用或API失敗）',
     netErrNotice: '網路不可用或服務不可達，已回退到本機詞典模式',
+    sourceLabel: '來源',
     openSettingsBtn: '開啟設定',
     viewFullBtn: '檢視完整內容',
   },
@@ -163,6 +164,7 @@ const UI_TEXT: Record<string, UiStrings> = {
     closeBtn: '닫기',
     offlineNotice: '로컬 사전 모드, 결과가 불완전할 수 있습니다 (네트워크/API 문제)',
     netErrNotice: '네트워크를 사용할 수 없어 로컬 사전으로 대체합니다',
+    sourceLabel: '출처',
     openSettingsBtn: '설정 열기',
     viewFullBtn: '전체 보기',
   },
@@ -189,6 +191,7 @@ const UI_TEXT: Record<string, UiStrings> = {
     closeBtn: 'Fermer',
     offlineNotice: 'Mode dictionnaire local; le résultat peut être incomplet (problèmes réseau/API)',
     netErrNotice: 'Réseau indisponible; passage au dictionnaire local',
+    sourceLabel: 'Source',
     openSettingsBtn: 'Ouvrir les paramètres',
     viewFullBtn: 'Voir tout le contenu',
   },
@@ -215,6 +218,7 @@ const UI_TEXT: Record<string, UiStrings> = {
     closeBtn: 'Schließen',
     offlineNotice: 'Lokaler Wörterbuch-Modus; Ergebnis könnte unvollständig sein (Netzwerk-/API-Probleme)',
     netErrNotice: 'Netzwerk nicht verfügbar; Rückfall auf lokales Wörterbuch',
+    sourceLabel: 'Quelle',
     openSettingsBtn: 'Einstellungen öffnen',
     viewFullBtn: 'Gesamten Inhalt anzeigen',
   },
@@ -244,6 +248,7 @@ let currentDisplayToken = 0; // 防止旧的定时器清除新的显示
 let currentRequestId = 0; // 防止旧的翻译结果覆盖新的显示
 let lastOriginalForDetails: string = '';
 let lastTranslatedForDetails: string = '';
+let lastTranslationProvider: string = '';
 let lastClickTime = 0;
 let lastClickPosition: vscode.Position | undefined;
 let lastSelectionAt = 0; // 最近一次处理非空选择的时间，用于抑制紧随其后的点击翻译覆盖
@@ -492,19 +497,16 @@ export function activate(context: vscode.ExtensionContext) {
         if (mode === 'system') {
             const headerOriginal = `=======${ui.tooltipOriginal}=======`;
             const headerTranslation = `=======${ui.tooltipTranslation}=======`;
-            // 解析来源与去除内部标记
+            // 使用保存的翻译内容和提供商信息
             let translatedForDialog = lastTranslatedForDetails;
-            let providerTag = '';
-            const providerMatch = translatedForDialog.match(/^\[\[PROVIDER:([^\]]+)\]\]\s*/);
-            if (providerMatch) {
-                providerTag = providerMatch[1];
-                translatedForDialog = translatedForDialog.replace(providerMatch[0], '');
-            }
-            translatedForDialog = translatedForDialog.replace(/^\[\[(OFFLINE|NETERR|DICT)\]\]\s*/i, '');
-            const hasOffline = lastTranslatedForDetails.startsWith('[[OFFLINE]]');
-            const hasNetErr = lastTranslatedForDetails.startsWith('[[NETERR]]');
+            
+            // 移除可能存在的标记前缀
+            translatedForDialog = translatedForDialog.replace(/^\[\[.*?\]\]\s*/g, '');
+            
+            const hasOffline = lastTranslatedForDetails.includes('[[OFFLINE]]');
+            const hasNetErr = lastTranslatedForDetails.includes('[[NETERR]]');
             const notice = hasOffline ? ui.offlineNotice : (hasNetErr ? ui.netErrNotice : '');
-            const sourceLine = providerTag ? `\n\n${ui.sourceLabel || '来源'}：${providerTag}` : '';
+            const sourceLine = lastTranslationProvider ? `\n\n${ui.sourceLabel || '来源'}：${lastTranslationProvider}` : '';
             // 原文过长时：只保留前200字符，并在末尾追加六个黑点省略号
             const blackDots = '⚫️⚫️⚫️⚫️⚫️⚫️';
             const originalLines = (lastOriginalForDetails || '').split(/\r?\n/).length;
@@ -551,13 +553,12 @@ export function activate(context: vscode.ExtensionContext) {
                 const noticePanel = hasOfflinePanel ? ui.offlineNotice : (hasNetErrPanel ? ui.netErrNotice : '');
                 const originalEsc = escapeHtml(lastOriginalForDetails);
                 let translatedForPanel2 = lastTranslatedForDetails;
-                let providerTagPanel2 = '';
-                const providerMatchPanel2 = translatedForPanel2.match(/^\[\[PROVIDER:([^\]]+)\]\]\s*/);
-                if (providerMatchPanel2) {
-                    providerTagPanel2 = providerMatchPanel2[1];
-                    translatedForPanel2 = translatedForPanel2.replace(providerMatchPanel2[0], '');
-                }
-                const translatedEsc2 = escapeHtml(translatedForPanel2.replace(/^\[\[(OFFLINE|NETERR|DICT)\]\]\s*/i, ''));
+                
+                // 移除可能存在的标记前缀
+                translatedForPanel2 = translatedForPanel2.replace(/^\[\[.*?\]\]\s*/g, '');
+                
+                const providerTagPanel2 = lastTranslationProvider;
+                const translatedEsc2 = escapeHtml(translatedForPanel2);
                 panel.webview.html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -650,15 +651,14 @@ export function activate(context: vscode.ExtensionContext) {
         const notice = hasOfflinePanel ? ui.offlineNotice : (hasNetErrPanel ? ui.netErrNotice : '');
 
         const originalEsc = escapeHtml(lastOriginalForDetails);
-        // 解析面板中的来源/provider，并清理内部标记
+        // 使用保存的翻译内容和提供商信息
         let translatedForPanel = lastTranslatedForDetails;
-        let providerTagPanel = '';
-        const providerMatchPanel = translatedForPanel.match(/^\[\[PROVIDER:([^\]]+)\]\]\s*/);
-        if (providerMatchPanel) {
-            providerTagPanel = providerMatchPanel[1];
-            translatedForPanel = translatedForPanel.replace(providerMatchPanel[0], '');
-        }
-        const translatedEsc = escapeHtml(translatedForPanel.replace(/^\[\[(OFFLINE|NETERR|DICT)\]\]\s*/i, ''));
+        
+        // 移除可能存在的标记前缀
+        translatedForPanel = translatedForPanel.replace(/^\[\[.*?\]\]\s*/g, '');
+        
+        const providerTagPanel = lastTranslationProvider;
+        const translatedEsc = escapeHtml(translatedForPanel);
 
         panel.webview.html = `<!DOCTYPE html>
 <html lang="en">
@@ -882,15 +882,15 @@ async function translateTextWithOriginal(text: string, originalText: string) {
         const sourceLang = config.get<string>('sourceLanguage', 'auto');
         
         // 调用翻译服务
-        const enhancedText = await translationManager.translate(text, targetLang, sourceLang);
+        const result = await translationManager.translate(text, targetLang, sourceLang);
         // 仅当该请求仍为最新时才展示结果
         if (requestIdAtStart !== currentRequestId) {
             return;
         }
         
         // 显示翻译结果
-        console.log('Translation result:', enhancedText);
-        displayTranslation(enhancedText, originalText);
+        console.log('Translation result:', result.translation, 'Provider:', result.provider);
+        displayTranslation(result.translation, originalText, result.provider);
         lastTranslatedText = originalText;
     } catch (error) {
         console.error('Translation error:', error);
@@ -923,7 +923,7 @@ async function translateTextWithOriginal(text: string, originalText: string) {
     }
 }
 
-function displayTranslation(translatedText: string, originalText: string) {
+function displayTranslation(translatedText: string, originalText: string, provider?: string) {
     // 检查是否有有效的翻译结果
     const ui = getUiStrings();
     if (!translatedText || translatedText.includes('翻译失败') || translatedText.includes('网络不可用') || translatedText.startsWith('[[NETERR]]')) {
@@ -947,18 +947,16 @@ function displayTranslation(translatedText: string, originalText: string) {
         return;
     }
     
-    // 将多行内容压缩为“多段”，每段以 "- " 开头，并用两个空格分隔
+    // 将多行内容压缩为"多段"，每段以 "- " 开头，并用两个空格分隔
     const maxLength = 70; // 状态栏文本总长度上限
     let statusTextSource = translatedText;
 
-    // 解析并移除内部标记前缀，并提取提供商
-    let providerTag = '';
-    const providerMatch = statusTextSource.match(/^\[\[PROVIDER:([^\]]+)\]\]\s*/);
-    if (providerMatch) {
-        providerTag = providerMatch[1];
-        statusTextSource = statusTextSource.replace(providerMatch[0], '');
-    }
-    statusTextSource = statusTextSource.replace(/^\[\[(OFFLINE|NETERR|DICT)\]\]\s*/i, '');
+    // 使用传入的provider参数，不再从文本中解析
+    const providerTag = provider || '';
+    
+    // 移除可能存在的标记前缀
+    statusTextSource = statusTextSource.replace(/^\[\[.*?\]\]\s*/g, '');
+    
     // 移除术语解释部分（状态栏不显示）
     if (statusTextSource.includes('📝 编程术语解释')) {
         statusTextSource = statusTextSource.split('📝 编程术语解释')[0].trim();
@@ -985,6 +983,7 @@ function displayTranslation(translatedText: string, originalText: string) {
     // 记录详情文本（完整内容）
     lastOriginalForDetails = originalText;
     lastTranslatedForDetails = translatedText;
+    lastTranslationProvider = providerTag;
 
     // 获取配置
     const config = vscode.workspace.getConfiguration('codeTranslator');
@@ -1012,11 +1011,7 @@ function displayTranslation(translatedText: string, originalText: string) {
     const shortenOriginalForTooltip = (s: string) => s.length > 50 ? (s.slice(0, 20) + '…' + s.slice(-18)) : s;
     const providerInfo = providerTag ? `\n\n${ui.sourceLabel || '来源'}：${providerTag}` : '';
     // 先显示译文，再显示原文
-    const translatedForTooltip = truncateMultiline(
-        translatedText
-          .replace(/^\[\[(OFFLINE|NETERR|DICT)\]\]\s*/i,'')
-          .replace(/^\[\[PROVIDER:[^\]]+\]\]\s*/, '')
-    );
+    const translatedForTooltip = truncateMultiline(statusTextSource);
     statusBarItem.tooltip = `${ui.tooltipTranslation}：${translatedForTooltip}\n\n${ui.tooltipOriginal}：${shortenOriginalForTooltip(originalText)}${providerInfo}\n\n${ui.tooltipViewDetails}`;
     statusBarItem.command = 'codeTranslator.showDetails';
     

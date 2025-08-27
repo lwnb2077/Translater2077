@@ -88,14 +88,16 @@
             "deepl",
             "microsoft",
             "openai",
-            "gemini"
+            "gemini",
+            "deepseek"
           ],
           "enumDescriptions": [
             "Google Translate - 支持100+语言",
             "DeepL - 高质量翻译（支持免费版和专业版）",
             "微软翻译 - 支持60+语言",
             "OpenAI GPT‑4o mini - 高性价比多模态（需要 API Key）",
-            "Google Gemini 2.5 Flash - 多模态低延迟（需要 API Key）"
+            "Google Gemini 2.5 Flash - 多模态低延迟（需要 API Key）",
+            "DeepSeek v3.1 - 强大语言模型翻译（需要 API Key）"
           ],
           "description": "翻译服务提供商"
         },
@@ -190,6 +192,11 @@
           "type": "string",
           "default": "",
           "description": "Google AI Studio API Key（用于 Gemini 2.5 Flash）"
+        },
+        "codeTranslator.deepseekApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "DeepSeek API Key（用于 DeepSeek v3.1）"
         },
         "codeTranslator.autoTranslate": {
           "type": "boolean",
