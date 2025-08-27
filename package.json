@@ -1,9 +1,10 @@
 {
-  "name": "code-translator",
+  "name": "Translator2077",
   "displayName": "Code Translator - 智能代码翻译器",
   "description": "一键翻译代码和单词，支持划词翻译、点击翻译，多种翻译服务可选",
   "version": "1.1.0",
-  "publisher": "code-translator",
+  "publisher": "SILENTCORELTD",
+  "icon": "icon.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/yourusername/code-translator"

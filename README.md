@@ -1,5 +1,7 @@
 ## Code Translator – Inline Translation for Editors
 
+![Demo](demo.gif)
+
 在 VS Code / Cursor 内，翻译其中单词、句子与段落到各种语言。它只显示结果，不会修改任何代码或文件。
 
 ---
