@@ -95,14 +95,14 @@ Settings
 ## 安装方法 / Installation
 
 ### 方法一：下载 .vsix 文件安装
-1. 下载仓库中的 `code-translator-1.1.0.vsix` 文件
+1. 下载仓库中的 `Translator2077-1.1.0.vsix` 文件
 2. 打开 VS Code
 3. 按下 `Ctrl+Shift+P` (Windows/Linux) 或 `Cmd+Shift+P` (Mac)
 4. 输入 "Extensions: Install from VSIX"
 5. 选择下载的 .vsix 文件进行安装
 
 ### Method 1: Install from .vsix file
-1. Download `code-translator-1.1.0.vsix` from this repository
+1. Download `Translator2077-1.1.0.vsix` from this repository
 2. Open VS Code
 3. Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
 4. Type "Extensions: Install from VSIX"
