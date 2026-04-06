@@ -254,7 +254,7 @@ let lastClickPosition: vscode.Position | undefined;
 let lastSelectionAt = 0; // 最近一次处理非空选择的时间，用于抑制紧随其后的点击翻译覆盖
 
 export function activate(context: vscode.ExtensionContext) {
-    console.log('Code Translator extension is now active!');
+    console.log('Translator2077 extension is now active!');
 
     // 创建翻译结果状态栏项
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);

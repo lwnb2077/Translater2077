@@ -18,7 +18,7 @@ export class SettingsPanel {
 
         const panel = vscode.window.createWebviewPanel(
             'codeTranslatorSettings',
-            '代码翻译器设置',
+            'Translator2077设置',
             column || vscode.ViewColumn.One,
             {
                 enableScripts: true,
@@ -118,7 +118,7 @@ export class SettingsPanel {
                 message: 'settingsSavedSuccess'
             });
 
-            vscode.window.showInformationMessage('代码翻译器设置已保存！');
+            vscode.window.showInformationMessage('Translator2077设置已保存！');
         } catch (error) {
             this._panel.webview.postMessage({
                 type: 'settingsSaved',
@@ -257,7 +257,7 @@ export class SettingsPanel {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
-    <title>代码翻译器设置</title>
+    <title>Translator2077设置</title>
     <style>
         /* 语言切换按钮样式 */
         .language-switcher {
@@ -479,7 +479,7 @@ export class SettingsPanel {
     </div>
 
     <div class="container">
-        <h1 data-i18n="title">代码翻译器设置</h1>
+        <h1 data-i18n="title">Translator2077设置</h1>
         
         <div id="messages"></div>
         
@@ -716,7 +716,7 @@ export class SettingsPanel {
         // 多语言资源
         const i18nResources = {
             zh: {
-                title: "🌐 代码翻译器设置",
+                title: "🌐 Translator2077设置",
                 apiSettings: "🔑 翻译API设置",
                 providerLabel: "翻译服务提供商：",
                 "provider.google": "Google Translate",
@@ -797,7 +797,7 @@ export class SettingsPanel {
                 geminiNotes: "需要在 Google AI Studio 申请 API Key；部分地区不可用或需代理，计费与配额以官方为准。"
             },
             en: {
-                title: "🌐 Code Translator Settings",
+                title: "🌐 Translator2077 Settings",
                 apiSettings: "🔑 Translation API Settings",
                 providerLabel: "Translation Service Provider:",
                 "provider.google": "Google Translate",
@@ -878,7 +878,7 @@ export class SettingsPanel {
                 geminiNotes: "Requires API key from Google AI Studio; some regions may be unavailable or require proxy, with fees and quotas subject to official documentation."
             },
             ja: {
-                title: "🌐 コード翻訳器設定",
+                title: "🌐 Translator2077 設定",
                 apiSettings: "🔑 翻訳API設定",
                 providerLabel: "翻訳サービスプロバイダー：",
                 "provider.google": "Google翻訳",

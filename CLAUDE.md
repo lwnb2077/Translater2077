@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Visual Studio Code extension called **Code Translator** (代码翻译器) that provides intelligent translation services for code comments, variables, and text within the editor. The extension supports multiple translation providers including Google Translate, DeepL, Microsoft Translator, OpenAI GPT-4o mini, and Google Gemini 2.5 Flash.
+This is a Visual Studio Code extension called **Translator2077** that provides intelligent translation services for code comments, variables, and text within the editor. The extension supports multiple translation providers including Google Translate, DeepL, Microsoft Translator, OpenAI GPT-4o mini, and Google Gemini 2.5 Flash.
 
 ## Development Commands
 

@@ -1,4 +1,4 @@
-## Code Translator – Inline Translation for Editors
+## Translator2077 – Inline Translation for Editors
 
 ![Demo](demo.gif)
 
@@ -94,27 +94,32 @@ Settings
 
 ## 安装方法 / Installation
 
+在开始之前，请确保已安装 [Node.js](https://nodejs.org/) 16+ 与 npm。
+
 ### 方法一：下载 .vsix 文件安装
-1. 下载仓库中的 `Translator2077-1.1.0.vsix` 文件
-2. 打开 VS Code
-3. 按下 `Ctrl+Shift+P` (Windows/Linux) 或 `Cmd+Shift+P` (Mac)
-4. 输入 "Extensions: Install from VSIX"
-5. 选择下载的 .vsix 文件进行安装
+1. 从本仓库或 Releases 页面下载 `Translator2077-1.1.0.vsix` 文件  
+2. 打开 VS Code / Cursor  
+3. 按 `Ctrl+Shift+P`（Windows/Linux）或 `Cmd+Shift+P`（Mac）  
+4. 输入 “Extensions: Install from VSIX”  
+5. 选择下载的 .vsix 文件完成安装  
 
 ### Method 1: Install from .vsix file
-1. Download `Translator2077-1.1.0.vsix` from this repository
-2. Open VS Code
-3. Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)
-4. Type "Extensions: Install from VSIX"
-5. Select the downloaded .vsix file to install
+1. Download `Translator2077-1.1.0.vsix` from this repository or the releases page  
+2. Open VS Code / Cursor  
+3. Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)  
+4. Type “Extensions: Install from VSIX”  
+5. Choose the downloaded `.vsix` to finish installation  
 
-### 方法二：从源码编译
+### 方法二：从源码构建 / Build from source
 ```bash
 git clone https://github.com/lwnb2077/code-translator.git
 cd code-translator
 npm install
-npm run compile
+npm run compile    # 生成 out/ 目录
+# 可选：npx vsce package  # 打包 VSIX
 ```
+
+构建完成后，可按上述步骤安装生成的 `.vsix`。所有翻译服务的 API Key **不会**附带在仓库中，请在 VS Code 设置中自行配置，密钥仅保存在本地。
 
 ---
 
