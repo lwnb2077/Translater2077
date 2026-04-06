@@ -459,6 +459,274 @@ export class DeepSeekTranslator {
     }
 }
 
+/** OpenAI Chat Completions 兼容端点：支持 `…/v1` 或完整 `…/v1/chat/completions`（与 OpenRouter / 多数聚合商一致） */
+export function normalizeOpenAiChatCompletionsUrl(input: string): string {
+    const raw = input.trim().replace(/\/+$/, '');
+    if (!raw) {
+        return 'https://api.openai.com/v1/chat/completions';
+    }
+    if (/\/chat\/completions$/i.test(raw)) {
+        return raw;
+    }
+    return `${raw}/chat/completions`;
+}
+
+/** Anthropic Messages API：支持 `…/v1/messages` 或 `…/v1` 基址 */
+export function normalizeAnthropicMessagesUrl(input: string): string {
+    const raw = input.trim().replace(/\/+$/, '');
+    if (!raw) {
+        return 'https://api.anthropic.com/v1/messages';
+    }
+    if (/\/messages$/i.test(raw)) {
+        return raw;
+    }
+    return `${raw}/messages`;
+}
+
+function buildTranslationSystemPrompt(targetLang: string, sourceLang: string): string {
+    const src = sourceLang === 'auto' ? 'the detected source language' : sourceLang;
+    return `You are a professional translator for software developers. Translate the user's text into ${targetLang}. Source context: ${src}. Preserve code blocks, identifiers, and markup; keep meaning accurate. Output only the translated text, no explanations.`;
+}
+
+function extractOpenAiStyleContent(data: any): string | null {
+    const c = data?.choices?.[0]?.message?.content;
+    if (typeof c === 'string' && c.length > 0) {
+        return c;
+    }
+    return null;
+}
+
+function extractAnthropicMessageText(data: any): string | null {
+    const blocks = data?.content;
+    if (!Array.isArray(blocks)) {
+        return null;
+    }
+    const parts: string[] = [];
+    for (const b of blocks) {
+        if (b?.type === 'text' && typeof b.text === 'string') {
+            parts.push(b.text);
+        }
+    }
+    return parts.length ? parts.join('') : null;
+}
+
+/** OpenRouter：OpenAI 兼容 Chat Completions，鉴权为 Bearer；可选 HTTP-Referer、X-OpenRouter-Title（官方推荐用于排行与统计） */
+export class OpenRouterTranslator {
+    name = 'openrouter';
+    private readonly endpoint = 'https://openrouter.ai/api/v1/chat/completions';
+    private apiKey: string;
+    private model: string;
+    private siteUrl: string;
+    private siteTitle: string;
+
+    constructor(apiKey?: string, model?: string, siteUrl?: string, siteTitle?: string) {
+        this.apiKey = apiKey || '';
+        this.model = (model || 'openai/gpt-4o-mini').trim();
+        this.siteUrl = (siteUrl || '').trim();
+        this.siteTitle = (siteTitle || 'Translator2077').trim() || 'Translator2077';
+    }
+
+    private headers(): Record<string, string> {
+        const h: Record<string, string> = {
+            Authorization: `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+        };
+        if (this.siteUrl) {
+            h['HTTP-Referer'] = this.siteUrl;
+        }
+        h['X-OpenRouter-Title'] = this.siteTitle;
+        return h;
+    }
+
+    async translate(text: string, targetLang: string = 'zh-CN', sourceLang: string = 'auto'): Promise<string> {
+        if (!this.apiKey) {
+            throw new Error('OpenRouter 需要 API Key');
+        }
+        const system = buildTranslationSystemPrompt(targetLang, sourceLang);
+        const resp = await axios.post(
+            this.endpoint,
+            {
+                model: this.model,
+                messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: text },
+                ],
+                temperature: 0.2,
+                max_tokens: 4096,
+            },
+            { headers: this.headers(), timeout: 120000 }
+        );
+        const out = extractOpenAiStyleContent(resp.data);
+        if (!out) {
+            throw new Error('OpenRouter 返回为空或格式异常');
+        }
+        return out;
+    }
+
+    async testConnection(): Promise<boolean> {
+        try {
+            if (!this.apiKey) {
+                return false;
+            }
+            const resp = await axios.post(
+                this.endpoint,
+                {
+                    model: this.model,
+                    messages: [{ role: 'user', content: 'ping' }],
+                    max_tokens: 8,
+                },
+                { headers: this.headers(), timeout: 30000 }
+            );
+            return resp.status >= 200 && resp.status < 300;
+        } catch {
+            return false;
+        }
+    }
+}
+
+/** 任意 OpenAI 兼容 Chat Completions（含自建代理、Groq、Together 等，仅需 base URL + Key + 模型名） */
+export class OpenAICompatibleTranslator {
+    name = 'customOpenAI';
+    private apiKey: string;
+    private chatUrl: string;
+    private model: string;
+
+    constructor(apiKey?: string, baseUrl?: string, model?: string) {
+        this.apiKey = apiKey || '';
+        this.chatUrl = normalizeOpenAiChatCompletionsUrl(baseUrl || 'https://api.openai.com/v1');
+        this.model = (model || 'gpt-4o-mini').trim();
+    }
+
+    async translate(text: string, targetLang: string = 'zh-CN', sourceLang: string = 'auto'): Promise<string> {
+        if (!this.apiKey) {
+            throw new Error('自定义 OpenAI 兼容接口需要 API Key');
+        }
+        const system = buildTranslationSystemPrompt(targetLang, sourceLang);
+        const resp = await axios.post(
+            this.chatUrl,
+            {
+                model: this.model,
+                messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: text },
+                ],
+                temperature: 0.2,
+                max_tokens: 4096,
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                timeout: 120000,
+            }
+        );
+        const out = extractOpenAiStyleContent(resp.data);
+        if (!out) {
+            throw new Error('OpenAI 兼容接口返回为空或格式异常');
+        }
+        return out;
+    }
+
+    async testConnection(): Promise<boolean> {
+        try {
+            if (!this.apiKey) {
+                return false;
+            }
+            const resp = await axios.post(
+                this.chatUrl,
+                {
+                    model: this.model,
+                    messages: [{ role: 'user', content: 'ok' }],
+                    max_tokens: 5,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${this.apiKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 30000,
+                }
+            );
+            return resp.status >= 200 && resp.status < 300;
+        } catch {
+            return false;
+        }
+    }
+}
+
+/** 任意 Anthropic Messages 兼容端点（官方 Claude、AWS Bedrock 代理、第三方 Claude 网关等） */
+export class AnthropicCompatibleTranslator {
+    name = 'customAnthropic';
+    private apiKey: string;
+    private messagesUrl: string;
+    private model: string;
+    private anthropicVersion: string;
+
+    constructor(apiKey?: string, baseUrl?: string, model?: string, anthropicVersion?: string) {
+        this.apiKey = apiKey || '';
+        this.messagesUrl = normalizeAnthropicMessagesUrl(baseUrl || 'https://api.anthropic.com/v1/messages');
+        this.model = (model || 'claude-3-5-haiku-20241022').trim();
+        this.anthropicVersion = (anthropicVersion || '2023-06-01').trim();
+    }
+
+    async translate(text: string, targetLang: string = 'zh-CN', sourceLang: string = 'auto'): Promise<string> {
+        if (!this.apiKey) {
+            throw new Error('Anthropic 兼容接口需要 API Key');
+        }
+        const system = buildTranslationSystemPrompt(targetLang, sourceLang);
+        const resp = await axios.post(
+            this.messagesUrl,
+            {
+                model: this.model,
+                max_tokens: 4096,
+                system,
+                messages: [{ role: 'user', content: text }],
+            },
+            {
+                headers: {
+                    'x-api-key': this.apiKey,
+                    'anthropic-version': this.anthropicVersion,
+                    'Content-Type': 'application/json',
+                },
+                timeout: 120000,
+            }
+        );
+        const out = extractAnthropicMessageText(resp.data);
+        if (!out) {
+            throw new Error('Anthropic 兼容接口返回为空或格式异常');
+        }
+        return out;
+    }
+
+    async testConnection(): Promise<boolean> {
+        try {
+            if (!this.apiKey) {
+                return false;
+            }
+            const resp = await axios.post(
+                this.messagesUrl,
+                {
+                    model: this.model,
+                    max_tokens: 12,
+                    messages: [{ role: 'user', content: 'hi' }],
+                },
+                {
+                    headers: {
+                        'x-api-key': this.apiKey,
+                        'anthropic-version': this.anthropicVersion,
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 30000,
+                }
+            );
+            return resp.status >= 200 && resp.status < 300;
+        } catch {
+            return false;
+        }
+    }
+}
+
 // 编程术语词典
 export class CodeTermDictionary {
     // multi-language glossary; default zh-CN

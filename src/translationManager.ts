@@ -1,5 +1,15 @@
 import * as vscode from 'vscode';
-import { GoogleTranslator, CodeTermDictionary, OpenAITranslator, GeminiTranslator, DeepLTranslator, DeepSeekTranslator } from './translator';
+import {
+    GoogleTranslator,
+    CodeTermDictionary,
+    OpenAITranslator,
+    GeminiTranslator,
+    DeepLTranslator,
+    DeepSeekTranslator,
+    OpenRouterTranslator,
+    OpenAICompatibleTranslator,
+    AnthropicCompatibleTranslator,
+} from './translator';
 import axios from 'axios';
 
 export interface TranslationProvider {
@@ -89,9 +99,12 @@ export class TranslationManager {
 
     public updateProvider(providerName: string, config: vscode.WorkspaceConfiguration) {
         const apiKey = config.get<string>(`${providerName}ApiKey`, '')
-            || (providerName === 'openai' ? config.get<string>('openaiApiKey','') : '')
-            || (providerName === 'gemini' ? config.get<string>('geminiApiKey','') : '')
-            || (providerName === 'deepseek' ? config.get<string>('deepseekApiKey','') : '');
+            || (providerName === 'openai' ? config.get<string>('openaiApiKey', '') : '')
+            || (providerName === 'gemini' ? config.get<string>('geminiApiKey', '') : '')
+            || (providerName === 'deepseek' ? config.get<string>('deepseekApiKey', '') : '')
+            || (providerName === 'openrouter' ? config.get<string>('openrouterApiKey', '') : '')
+            || (providerName === 'customOpenAI' ? config.get<string>('customOpenAIApiKey', '') : '')
+            || (providerName === 'customAnthropic' ? config.get<string>('customAnthropicApiKey', '') : '');
         
         let provider: TranslationProvider;
         
@@ -116,6 +129,29 @@ export class TranslationManager {
                 break;
             case 'deepseek':
                 provider = new DeepSeekTranslator(apiKey);
+                break;
+            case 'openrouter':
+                provider = new OpenRouterTranslator(
+                    apiKey,
+                    config.get<string>('openrouterModel', 'openai/gpt-4o-mini'),
+                    config.get<string>('openrouterSiteUrl', ''),
+                    config.get<string>('openrouterSiteTitle', 'Translator2077')
+                );
+                break;
+            case 'customOpenAI':
+                provider = new OpenAICompatibleTranslator(
+                    apiKey,
+                    config.get<string>('customOpenAIBaseUrl', 'https://api.openai.com/v1'),
+                    config.get<string>('customOpenAIModel', 'gpt-4o-mini')
+                );
+                break;
+            case 'customAnthropic':
+                provider = new AnthropicCompatibleTranslator(
+                    apiKey,
+                    config.get<string>('customAnthropicBaseUrl', 'https://api.anthropic.com/v1/messages'),
+                    config.get<string>('customAnthropicModel', 'claude-3-5-haiku-20241022'),
+                    config.get<string>('customAnthropicVersion', '2023-06-01')
+                );
                 break;
             default:
                 provider = new GoogleTranslator(apiKey);

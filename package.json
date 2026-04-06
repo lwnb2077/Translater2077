@@ -90,7 +90,10 @@
             "microsoft",
             "openai",
             "gemini",
-            "deepseek"
+            "deepseek",
+            "openrouter",
+            "customOpenAI",
+            "customAnthropic"
           ],
           "enumDescriptions": [
             "Google Translate - 支持100+语言",
@@ -98,7 +101,10 @@
             "微软翻译 - 支持60+语言",
             "OpenAI GPT‑4o mini - 高性价比多模态（需要 API Key）",
             "Google Gemini 2.5 Flash - 多模态低延迟（需要 API Key）",
-            "DeepSeek v3.1 - 强大语言模型翻译（需要 API Key）"
+            "DeepSeek v3.1 - 强大语言模型翻译（需要 API Key）",
+            "OpenRouter - 统一 OpenAI 兼容网关，自选模型（需 Key，可选 Referer/Title）",
+            "自定义 OpenAI 兼容 - 任意 Chat Completions 基址 + 模型 + Key",
+            "自定义 Anthropic 兼容 - 任意 Messages API 端点 + 模型 + Key"
           ],
           "description": "翻译服务提供商"
         },
@@ -199,6 +205,61 @@
           "default": "",
           "description": "DeepSeek API Key（用于 DeepSeek v3.1）"
         },
+        "codeTranslator.openrouterApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenRouter API Key（https://openrouter.ai/keys）"
+        },
+        "codeTranslator.openrouterModel": {
+          "type": "string",
+          "default": "openai/gpt-4o-mini",
+          "description": "OpenRouter 模型 ID（如 openai/gpt-4o-mini、anthropic/claude-3.5-sonnet）"
+        },
+        "codeTranslator.openrouterSiteUrl": {
+          "type": "string",
+          "default": "",
+          "description": "可选：HTTP-Referer（公开站点 URL，用于 OpenRouter 排行统计）"
+        },
+        "codeTranslator.openrouterSiteTitle": {
+          "type": "string",
+          "default": "Translator2077",
+          "description": "可选：X-OpenRouter-Title（应用名称，用于 OpenRouter 统计）"
+        },
+        "codeTranslator.customOpenAIApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "自定义 OpenAI 兼容接口 API Key（Bearer）"
+        },
+        "codeTranslator.customOpenAIBaseUrl": {
+          "type": "string",
+          "default": "https://api.openai.com/v1",
+          "description": "Chat Completions 基址：可填 …/v1 或完整 …/v1/chat/completions"
+        },
+        "codeTranslator.customOpenAIModel": {
+          "type": "string",
+          "default": "gpt-4o-mini",
+          "description": "自定义 OpenAI 兼容接口使用的模型名"
+        },
+        "codeTranslator.customAnthropicApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Anthropic 兼容接口 API Key（x-api-key）"
+        },
+        "codeTranslator.customAnthropicBaseUrl": {
+          "type": "string",
+          "default": "https://api.anthropic.com/v1/messages",
+          "description": "Messages API：可填 …/v1/messages 或 …/v1 基址"
+        },
+        "codeTranslator.customAnthropicModel": {
+          "type": "string",
+          "default": "claude-3-5-haiku-20241022",
+          "description": "Anthropic 兼容接口模型 ID"
+        },
+        "codeTranslator.customAnthropicVersion": {
+          "type": "string",
+          "default": "2023-06-01",
+          "description": "anthropic-version 请求头（第三方代理需按其文档填写）"
+        },
         "codeTranslator.autoTranslate": {
           "type": "boolean",
           "default": true,
@@ -297,6 +358,6 @@
     "typescript": "^4.9.3"
   },
   "dependencies": {
-    "axios": "^1.6.0"
+    "axios": "^1.14.0"
   }
 }

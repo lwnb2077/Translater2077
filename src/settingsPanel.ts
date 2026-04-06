@@ -54,7 +54,7 @@ export class SettingsPanel {
                         await this._loadSettings();
                         break;
                     case 'testConnection':
-                        await this._testConnection(message.provider, message.apiKey, message.extras);
+                        await this._testConnection(message.provider, message.apiKey, message.extras || {});
                         break;
                     case 'openVSCodeSettings':
                         await this._openVSCodeSettings(message.setting);
@@ -111,6 +111,30 @@ export class SettingsPanel {
             if (typeof settings.microsoftRegion === 'string') {
                 await config.update('microsoftRegion', settings.microsoftRegion, vscode.ConfigurationTarget.Global);
             }
+            if (typeof settings.openrouterModel === 'string') {
+                await config.update('openrouterModel', settings.openrouterModel, vscode.ConfigurationTarget.Global);
+            }
+            if (typeof settings.openrouterSiteUrl === 'string') {
+                await config.update('openrouterSiteUrl', settings.openrouterSiteUrl, vscode.ConfigurationTarget.Global);
+            }
+            if (typeof settings.openrouterSiteTitle === 'string') {
+                await config.update('openrouterSiteTitle', settings.openrouterSiteTitle, vscode.ConfigurationTarget.Global);
+            }
+            if (typeof settings.customOpenAIBaseUrl === 'string') {
+                await config.update('customOpenAIBaseUrl', settings.customOpenAIBaseUrl, vscode.ConfigurationTarget.Global);
+            }
+            if (typeof settings.customOpenAIModel === 'string') {
+                await config.update('customOpenAIModel', settings.customOpenAIModel, vscode.ConfigurationTarget.Global);
+            }
+            if (typeof settings.customAnthropicBaseUrl === 'string') {
+                await config.update('customAnthropicBaseUrl', settings.customAnthropicBaseUrl, vscode.ConfigurationTarget.Global);
+            }
+            if (typeof settings.customAnthropicModel === 'string') {
+                await config.update('customAnthropicModel', settings.customAnthropicModel, vscode.ConfigurationTarget.Global);
+            }
+            if (typeof settings.customAnthropicVersion === 'string') {
+                await config.update('customAnthropicVersion', settings.customAnthropicVersion, vscode.ConfigurationTarget.Global);
+            }
 
             this._panel.webview.postMessage({
                 type: 'settingsSaved',
@@ -155,10 +179,21 @@ export class SettingsPanel {
                 microsoft: config.get('microsoftApiKey', ''),
                 openai: config.get('openaiApiKey', ''),
                 gemini: config.get('geminiApiKey', ''),
-                deepseek: config.get('deepseekApiKey', '')
+                deepseek: config.get('deepseekApiKey', ''),
+                openrouter: config.get('openrouterApiKey', ''),
+                customOpenAI: config.get('customOpenAIApiKey', ''),
+                customAnthropic: config.get('customAnthropicApiKey', '')
             },
             // 扩展提供商参数
-            microsoftRegion: config.get('microsoftRegion', 'global')
+            microsoftRegion: config.get('microsoftRegion', 'global'),
+            openrouterModel: config.get('openrouterModel', 'openai/gpt-4o-mini'),
+            openrouterSiteUrl: config.get('openrouterSiteUrl', ''),
+            openrouterSiteTitle: config.get('openrouterSiteTitle', 'Translator2077'),
+            customOpenAIBaseUrl: config.get('customOpenAIBaseUrl', 'https://api.openai.com/v1'),
+            customOpenAIModel: config.get('customOpenAIModel', 'gpt-4o-mini'),
+            customAnthropicBaseUrl: config.get('customAnthropicBaseUrl', 'https://api.anthropic.com/v1/messages'),
+            customAnthropicModel: config.get('customAnthropicModel', 'claude-3-5-haiku-20241022'),
+            customAnthropicVersion: config.get('customAnthropicVersion', '2023-06-01')
         };
 
         this._panel.webview.postMessage({
@@ -167,13 +202,25 @@ export class SettingsPanel {
         });
     }
 
-    private async _testConnection(provider: string, apiKey: string, extras?: any) {
+    private async _testConnection(provider: string, apiKey: string, extras: Record<string, string> = {}) {
         // 实际调用对应提供商进行连接测试
         try {
             const config = vscode.workspace.getConfiguration('codeTranslator');
 
             const { TranslationManager } = await import('./translationManager');
             const tm = new TranslationManager();
+
+            const extraKeys = new Set([
+                'openrouterModel',
+                'openrouterSiteUrl',
+                'openrouterSiteTitle',
+                'customOpenAIBaseUrl',
+                'customOpenAIModel',
+                'customAnthropicBaseUrl',
+                'customAnthropicModel',
+                'customAnthropicVersion',
+                'microsoftRegion',
+            ]);
 
             // 仅实现 get(section, default) 即可满足 updateProvider 的读取
             const tempConfig = {
@@ -185,7 +232,10 @@ export class SettingsPanel {
                     ) {
                         return (apiKey as unknown) as T;
                     }
-                    // 扩展提供商附加参数
+                    // 扩展提供商附加参数（表单优先）
+                    if (extraKeys.has(section) && extras[section] !== undefined && extras[section] !== '') {
+                        return extras[section] as unknown as T;
+                    }
                     if (section === 'deeplApiKey') {
                         return ((extras && extras.deeplApiKey) || apiKey || config.get(section as any, defaultValue as any)) as T;
                     }
@@ -199,7 +249,15 @@ export class SettingsPanel {
             tm.updateProvider(provider, tempConfig);
 
             // 对必须密钥的提供商进行空值拦截
-            const providersRequireKey = new Set(['deepl', 'openai', 'gemini', 'microsoft']);
+            const providersRequireKey = new Set([
+                'deepl',
+                'openai',
+                'gemini',
+                'microsoft',
+                'openrouter',
+                'customOpenAI',
+                'customAnthropic',
+            ]);
             if (providersRequireKey.has(provider) && (!apiKey || apiKey.trim().length === 0)) {
                 this._panel.webview.postMessage({
                     type: 'connectionTested',
@@ -496,6 +554,9 @@ export class SettingsPanel {
                     <option value="openai" data-i18n="provider.openai">OpenAI (GPT‑4o mini)</option>
                     <option value="gemini" data-i18n="provider.gemini">Google Gemini (2.5 Flash)</option>
                     <option value="deepseek" data-i18n="provider.deepseek">DeepSeek v3.1</option>
+                    <option value="openrouter" data-i18n="provider.openrouter">OpenRouter</option>
+                    <option value="customOpenAI" data-i18n="provider.customOpenAI">自定义 OpenAI 兼容</option>
+                    <option value="customAnthropic" data-i18n="provider.customAnthropic">自定义 Anthropic 兼容</option>
                 </select>
                 <div class="provider-info" id="providerInfo"></div>
             </div>
@@ -556,6 +617,68 @@ export class SettingsPanel {
                     <button type="button" class="secondary test-btn" data-provider="deepseek" data-i18n="testConnection">测试连接</button>
                 </div>
                 <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="deepseekNotes">强大的语言模型翻译服务，使用deepseek-chat模型，需要API Key。</p>
+            </div>
+            
+            <!-- OpenRouter -->
+            <div class="form-group api-key-section hidden" id="openrouterSection">
+                <label for="openrouterApiKey" data-i18n="openrouterApiKeyLabel">OpenRouter API Key：</label>
+                <div class="api-key-group">
+                    <input type="password" id="openrouterApiKey" autocomplete="off">
+                    <button type="button" class="secondary test-btn" data-provider="openrouter" data-i18n="testConnection">测试连接</button>
+                </div>
+                <div class="form-group" style="margin-top:10px;">
+                    <label for="openrouterModel" data-i18n="openrouterModelLabel">模型 ID：</label>
+                    <input type="text" id="openrouterModel" style="width:100%;box-sizing:border-box;" placeholder="openai/gpt-4o-mini">
+                </div>
+                <div class="form-group">
+                    <label for="openrouterSiteUrl" data-i18n="openrouterSiteUrlLabel">HTTP-Referer（可选）：</label>
+                    <input type="text" id="openrouterSiteUrl" style="width:100%;box-sizing:border-box;" placeholder="https://">
+                </div>
+                <div class="form-group">
+                    <label for="openrouterSiteTitle" data-i18n="openrouterSiteTitleLabel">X-OpenRouter-Title（可选）：</label>
+                    <input type="text" id="openrouterSiteTitle" style="width:100%;box-sizing:border-box;" placeholder="Translator2077">
+                </div>
+                <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="openrouterNotes">OpenAI 兼容 Chat Completions；鉴权 Bearer；可选 Referer/Title（OpenRouter 官方推荐）。</p>
+            </div>
+            
+            <!-- 自定义 OpenAI 兼容 -->
+            <div class="form-group api-key-section hidden" id="customOpenAISection">
+                <label for="customOpenAIApiKey" data-i18n="customOpenAIApiKeyLabel">API Key（Bearer）：</label>
+                <div class="api-key-group">
+                    <input type="password" id="customOpenAIApiKey" autocomplete="off">
+                    <button type="button" class="secondary test-btn" data-provider="customOpenAI" data-i18n="testConnection">测试连接</button>
+                </div>
+                <div class="form-group" style="margin-top:10px;">
+                    <label for="customOpenAIBaseUrl" data-i18n="customOpenAIBaseUrlLabel">基址 URL：</label>
+                    <input type="text" id="customOpenAIBaseUrl" style="width:100%;box-sizing:border-box;" placeholder="https://api.openai.com/v1">
+                </div>
+                <div class="form-group">
+                    <label for="customOpenAIModel" data-i18n="customOpenAIModelLabel">模型名：</label>
+                    <input type="text" id="customOpenAIModel" style="width:100%;box-sizing:border-box;" placeholder="gpt-4o-mini">
+                </div>
+                <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="customOpenAINotes">任意 OpenAI Chat Completions 兼容端点；可填 …/v1 或完整 …/chat/completions。</p>
+            </div>
+            
+            <!-- 自定义 Anthropic 兼容 -->
+            <div class="form-group api-key-section hidden" id="customAnthropicSection">
+                <label for="customAnthropicApiKey" data-i18n="customAnthropicApiKeyLabel">API Key（x-api-key）：</label>
+                <div class="api-key-group">
+                    <input type="password" id="customAnthropicApiKey" autocomplete="off">
+                    <button type="button" class="secondary test-btn" data-provider="customAnthropic" data-i18n="testConnection">测试连接</button>
+                </div>
+                <div class="form-group" style="margin-top:10px;">
+                    <label for="customAnthropicBaseUrl" data-i18n="customAnthropicBaseUrlLabel">Messages URL：</label>
+                    <input type="text" id="customAnthropicBaseUrl" style="width:100%;box-sizing:border-box;" placeholder="https://api.anthropic.com/v1/messages">
+                </div>
+                <div class="form-group">
+                    <label for="customAnthropicModel" data-i18n="customAnthropicModelLabel">模型 ID：</label>
+                    <input type="text" id="customAnthropicModel" style="width:100%;box-sizing:border-box;" placeholder="claude-3-5-haiku-20241022">
+                </div>
+                <div class="form-group">
+                    <label for="customAnthropicVersion" data-i18n="customAnthropicVersionLabel">anthropic-version：</label>
+                    <input type="text" id="customAnthropicVersion" style="width:100%;box-sizing:border-box;" placeholder="2023-06-01">
+                </div>
+                <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="customAnthropicNotes">Anthropic Messages API；第三方代理请按其文档填写版本头与 URL。</p>
             </div>
             
             </div>
@@ -725,6 +848,23 @@ export class SettingsPanel {
                 "provider.openai": "OpenAI (GPT‑4o mini)",
                 "provider.gemini": "Google Gemini (2.5 Flash)",
                 "provider.deepseek": "DeepSeek v3.1",
+                "provider.openrouter": "OpenRouter",
+                "provider.customOpenAI": "自定义 OpenAI 兼容",
+                "provider.customAnthropic": "自定义 Anthropic 兼容",
+                openrouterApiKeyLabel: "OpenRouter API Key：",
+                openrouterModelLabel: "模型 ID：",
+                openrouterSiteUrlLabel: "HTTP-Referer（可选）：",
+                openrouterSiteTitleLabel: "X-OpenRouter-Title（可选）：",
+                openrouterNotes: "OpenAI 兼容 Chat Completions；Bearer 鉴权；可选 Referer/Title（OpenRouter 文档推荐）。",
+                customOpenAIApiKeyLabel: "API Key（Bearer）：",
+                customOpenAIBaseUrlLabel: "基址 URL：",
+                customOpenAIModelLabel: "模型名：",
+                customOpenAINotes: "任意 OpenAI Chat Completions 兼容端点；可填 …/v1 或完整 …/chat/completions。",
+                customAnthropicApiKeyLabel: "API Key（x-api-key）：",
+                customAnthropicBaseUrlLabel: "Messages URL：",
+                customAnthropicModelLabel: "模型 ID：",
+                customAnthropicVersionLabel: "anthropic-version：",
+                customAnthropicNotes: "Anthropic Messages API；第三方网关请按其文档填写 URL 与版本头。",
                 googleApiKey: "Google Translate API Key：",
                 googleApiKeyPlaceholder: "输入您的Google API密钥（可选，不填使用免费服务）",
                 microsoftApiKey: "微软翻译API密钥：",
@@ -806,6 +946,23 @@ export class SettingsPanel {
                 "provider.openai": "OpenAI (GPT‑4o mini)",
                 "provider.gemini": "Google Gemini (2.5 Flash)",
                 "provider.deepseek": "DeepSeek v3.1",
+                "provider.openrouter": "OpenRouter",
+                "provider.customOpenAI": "Custom OpenAI-compatible",
+                "provider.customAnthropic": "Custom Anthropic-compatible",
+                openrouterApiKeyLabel: "OpenRouter API Key:",
+                openrouterModelLabel: "Model ID:",
+                openrouterSiteUrlLabel: "HTTP-Referer (optional):",
+                openrouterSiteTitleLabel: "X-OpenRouter-Title (optional):",
+                openrouterNotes: "OpenAI-compatible Chat Completions; Bearer auth; optional Referer/Title per OpenRouter docs.",
+                customOpenAIApiKeyLabel: "API Key (Bearer):",
+                customOpenAIBaseUrlLabel: "Base URL:",
+                customOpenAIModelLabel: "Model:",
+                customOpenAINotes: "Any OpenAI Chat Completions-compatible endpoint; use …/v1 or full …/chat/completions.",
+                customAnthropicApiKeyLabel: "API Key (x-api-key):",
+                customAnthropicBaseUrlLabel: "Messages URL:",
+                customAnthropicModelLabel: "Model ID:",
+                customAnthropicVersionLabel: "anthropic-version:",
+                customAnthropicNotes: "Anthropic Messages API; for third-party proxies follow their URL and version header docs.",
                 googleApiKey: "Google Translate API Key:",
                 googleApiKeyPlaceholder: "Enter your Google API key (optional, uses free service if empty)",
                 microsoftApiKey: "Microsoft Translator API Key:",
@@ -887,6 +1044,23 @@ export class SettingsPanel {
                 "provider.openai": "OpenAI (GPT‑4o mini)",
                 "provider.gemini": "Google Gemini (2.5 Flash)",
                 "provider.deepseek": "DeepSeek v3.1",
+                "provider.openrouter": "OpenRouter",
+                "provider.customOpenAI": "カスタム OpenAI 互換",
+                "provider.customAnthropic": "カスタム Anthropic 互換",
+                openrouterApiKeyLabel: "OpenRouter APIキー：",
+                openrouterModelLabel: "モデル ID：",
+                openrouterSiteUrlLabel: "HTTP-Referer（任意）：",
+                openrouterSiteTitleLabel: "X-OpenRouter-Title（任意）：",
+                openrouterNotes: "OpenAI 互換 Chat Completions。Bearer 認証。Referer/Title は OpenRouter 推奨。",
+                customOpenAIApiKeyLabel: "APIキー（Bearer）：",
+                customOpenAIBaseUrlLabel: "ベース URL：",
+                customOpenAIModelLabel: "モデル名：",
+                customOpenAINotes: "OpenAI Chat Completions 互換の任意エンドポイント。…/v1 または完全な …/chat/completions。",
+                customAnthropicApiKeyLabel: "APIキー（x-api-key）：",
+                customAnthropicBaseUrlLabel: "Messages URL：",
+                customAnthropicModelLabel: "モデル ID：",
+                customAnthropicVersionLabel: "anthropic-version：",
+                customAnthropicNotes: "Anthropic Messages API。サードパーティは各ドキュメントに従ってください。",
                 googleApiKey: "Google翻訳APIキー：",
                 googleApiKeyPlaceholder: "GoogleのAPIキーを入力（オプション、空の場合無料サービスを使用）",
                 microsoftApiKey: "Microsoft翻訳APIキー：",
@@ -1050,7 +1224,10 @@ export class SettingsPanel {
                 microsoft: "微软翻译，支持60多种语言，需要Azure订阅",
                 openai: "OpenAI (GPT‑4o mini)，需要有效的 OpenAI 账号与 API Key，计费按使用量收取；部分地区可能无法直连，需配置代理。",
                 gemini: "Google Gemini (2.5 Flash)，需要在 Google AI Studio 申请 API Key；部分地区不可用或需代理，计费与配额以官方为准。",
-                deepseek: "DeepSeek v3.1强大语言模型翻译，使用deepseek-chat模型，需要API Key。"
+                deepseek: "DeepSeek v3.1强大语言模型翻译，使用deepseek-chat模型，需要API Key。",
+                openrouter: "OpenRouter 统一网关，OpenAI 兼容 API；自选模型；可选 Referer/Title。",
+                customOpenAI: "任意 OpenAI Chat Completions 兼容 URL + 模型 + Key（自建/Groq/Together 等）。",
+                customAnthropic: "任意 Anthropic Messages 兼容端点 + 模型 + Key（含第三方 Claude 代理）。"
             },
             en: {
                 google: "Supports 100+ languages, free version has quota limits",
@@ -1058,7 +1235,10 @@ export class SettingsPanel {
                 microsoft: "Microsoft Translator, supports 60+ languages, requires Azure subscription",
                 openai: "OpenAI (GPT‑4o mini), requires a valid OpenAI account and API key, billed based on usage; some regions may not be directly accessible, requiring proxy configuration.",
                 gemini: "Google Gemini (2.5 Flash), requires API key from Google AI Studio; some regions may be unavailable or require proxy, with fees and quotas subject to official documentation.",
-                deepseek: "DeepSeek v3.1 powerful language model translation using deepseek-chat model, API key required."
+                deepseek: "DeepSeek v3.1 powerful language model translation using deepseek-chat model, API key required.",
+                openrouter: "OpenRouter unified gateway; OpenAI-compatible API; pick any model; optional Referer/Title.",
+                customOpenAI: "Any OpenAI Chat Completions-compatible URL + model + key (Groq, Together, self-hosted, etc.).",
+                customAnthropic: "Any Anthropic Messages-compatible endpoint + model + key (incl. third-party Claude proxies)."
             },
             ja: {
                 google: "100以上の言語をサポート、無料版には制限あり",
@@ -1066,7 +1246,10 @@ export class SettingsPanel {
                 microsoft: "Microsoft翻訳、60以上の言語をサポート、Azureサブスクリプションが必要",
                 openai: "OpenAI (GPT‑4o mini)，OpenAIのアカウントとAPIキーが必要です。従量課金。地域によりプロキシが必要な場合があります。",
                 gemini: "Google Gemini (2.5 Flash)，Google AI Studio でAPIキーが必要です。地域により利用不可/プロキシが必要な場合があります。",
-                deepseek: "DeepSeek v3.1強力な言語モデル翻訳、deepseek-chatモデルを使用、APIキーが必要。"
+                deepseek: "DeepSeek v3.1強力な言語モデル翻訳、deepseek-chatモデルを使用、APIキーが必要。",
+                openrouter: "OpenRouter 統合ゲートウェイ。OpenAI 互換 API。モデル選択可。Referer/Title 任意。",
+                customOpenAI: "任意の OpenAI Chat Completions 互換 URL + モデル + キー。",
+                customAnthropic: "任意の Anthropic Messages 互換エンドポイント + モデル + キー。"
             }
         };
         
@@ -1173,6 +1356,38 @@ export class SettingsPanel {
                     }
                 });
             }
+            if (settings.openrouterModel !== undefined) {
+                const el = document.getElementById('openrouterModel');
+                if (el) el.value = settings.openrouterModel;
+            }
+            if (settings.openrouterSiteUrl !== undefined) {
+                const el = document.getElementById('openrouterSiteUrl');
+                if (el) el.value = settings.openrouterSiteUrl;
+            }
+            if (settings.openrouterSiteTitle !== undefined) {
+                const el = document.getElementById('openrouterSiteTitle');
+                if (el) el.value = settings.openrouterSiteTitle;
+            }
+            if (settings.customOpenAIBaseUrl !== undefined) {
+                const el = document.getElementById('customOpenAIBaseUrl');
+                if (el) el.value = settings.customOpenAIBaseUrl;
+            }
+            if (settings.customOpenAIModel !== undefined) {
+                const el = document.getElementById('customOpenAIModel');
+                if (el) el.value = settings.customOpenAIModel;
+            }
+            if (settings.customAnthropicBaseUrl !== undefined) {
+                const el = document.getElementById('customAnthropicBaseUrl');
+                if (el) el.value = settings.customAnthropicBaseUrl;
+            }
+            if (settings.customAnthropicModel !== undefined) {
+                const el = document.getElementById('customAnthropicModel');
+                if (el) el.value = settings.customAnthropicModel;
+            }
+            if (settings.customAnthropicVersion !== undefined) {
+                const el = document.getElementById('customAnthropicVersion');
+                if (el) el.value = settings.customAnthropicVersion;
+            }
             
             // 触发提供商切换事件
             document.getElementById('apiProvider').dispatchEvent(new Event('change'));
@@ -1227,10 +1442,21 @@ export class SettingsPanel {
                     microsoft: document.getElementById('microsoftApiKey').value,
                     openai: document.getElementById('openaiApiKey').value,
                     gemini: document.getElementById('geminiApiKey').value,
-                    deepseek: document.getElementById('deepseekApiKey').value
+                    deepseek: document.getElementById('deepseekApiKey').value,
+                    openrouter: document.getElementById('openrouterApiKey')?.value || '',
+                    customOpenAI: document.getElementById('customOpenAIApiKey')?.value || '',
+                    customAnthropic: document.getElementById('customAnthropicApiKey')?.value || ''
                 },
                 // 扩展的提供商参数
-                microsoftRegion: document.getElementById('microsoftRegion')?.value || ''
+                microsoftRegion: document.getElementById('microsoftRegion')?.value || '',
+                openrouterModel: document.getElementById('openrouterModel')?.value || '',
+                openrouterSiteUrl: document.getElementById('openrouterSiteUrl')?.value || '',
+                openrouterSiteTitle: document.getElementById('openrouterSiteTitle')?.value || '',
+                customOpenAIBaseUrl: document.getElementById('customOpenAIBaseUrl')?.value || '',
+                customOpenAIModel: document.getElementById('customOpenAIModel')?.value || '',
+                customAnthropicBaseUrl: document.getElementById('customAnthropicBaseUrl')?.value || '',
+                customAnthropicModel: document.getElementById('customAnthropicModel')?.value || '',
+                customAnthropicVersion: document.getElementById('customAnthropicVersion')?.value || ''
             };
             
             // 立即在页面提示保存中，避免“无反应”的体验
@@ -1253,10 +1479,31 @@ export class SettingsPanel {
                 return;
             }
             
+            let extras = {};
+            if (provider === 'openrouter') {
+                extras = {
+                    openrouterModel: document.getElementById('openrouterModel')?.value || '',
+                    openrouterSiteUrl: document.getElementById('openrouterSiteUrl')?.value || '',
+                    openrouterSiteTitle: document.getElementById('openrouterSiteTitle')?.value || ''
+                };
+            } else if (provider === 'customOpenAI') {
+                extras = {
+                    customOpenAIBaseUrl: document.getElementById('customOpenAIBaseUrl')?.value || '',
+                    customOpenAIModel: document.getElementById('customOpenAIModel')?.value || ''
+                };
+            } else if (provider === 'customAnthropic') {
+                extras = {
+                    customAnthropicBaseUrl: document.getElementById('customAnthropicBaseUrl')?.value || '',
+                    customAnthropicModel: document.getElementById('customAnthropicModel')?.value || '',
+                    customAnthropicVersion: document.getElementById('customAnthropicVersion')?.value || ''
+                };
+            }
+            
             vscode.postMessage({
                 type: 'testConnection',
                 provider: provider,
-                apiKey: apiKey
+                apiKey: apiKey,
+                extras: extras
             });
         }
         
