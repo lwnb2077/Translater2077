@@ -97,14 +97,14 @@ Settings
 在开始之前，请确保已安装 [Node.js](https://nodejs.org/) 16+ 与 npm。
 
 ### 方法一：下载 .vsix 文件安装
-1. 从本仓库或 Releases 页面下载 `Translator2077-1.2.0.vsix` 文件  
+1. 从本仓库或 Releases 页面下载 `Translator2077-1.2.1.vsix` 文件  
 2. 打开 VS Code / Cursor  
 3. 按 `Ctrl+Shift+P`（Windows/Linux）或 `Cmd+Shift+P`（Mac）  
 4. 输入 “Extensions: Install from VSIX”  
 5. 选择下载的 .vsix 文件完成安装  
 
 ### Method 1: Install from .vsix file
-1. Download `Translator2077-1.2.0.vsix` from this repository or the releases page  
+1. Download `Translator2077-1.2.1.vsix` from this repository or the releases page  
 2. Open VS Code / Cursor  
 3. Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)  
 4. Type “Extensions: Install from VSIX”  

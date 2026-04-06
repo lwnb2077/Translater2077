@@ -8,3 +8,6 @@ coverage/
 .claude/
 .gemini-clipboard/
 *.vsix
+
+# 本地发布流程 Skill，不提交到 GitHub
+.cursor/skills/发布插件/
