@@ -2,7 +2,7 @@
   "name": "Translator2077",
   "displayName": "Translator2077",
   "description": "Translator2077：一键翻译代码和单词，支持划词翻译、点击翻译，多种翻译服务可选",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "license": "MIT",
   "publisher": "SILENTCORELTD",
   "icon": "icon.png",
@@ -39,22 +39,54 @@
         "command": "codeTranslator.translate",
         "title": "翻译选中内容"
       },
-      { "command": "codeTranslator.translate.zhCN", "title": "翻译为简体中文" },
-      { "command": "codeTranslator.translate.zhTW", "title": "翻譯為繁體中文" },
-      { "command": "codeTranslator.translate.en",   "title": "Translate to English" },
-      { "command": "codeTranslator.translate.ja",   "title": "日本語に翻訳" },
-      { "command": "codeTranslator.translate.ko",   "title": "한국어로 번역" },
-      { "command": "codeTranslator.translate.fr",   "title": "Traduire en français" },
-      { "command": "codeTranslator.translate.de",   "title": "Ins Deutsche übersetzen" },
-      { "command": "codeTranslator.translate.es",   "title": "Traducir al español" },
-      { "command": "codeTranslator.translate.it",   "title": "Traduci in italiano" },
-      { "command": "codeTranslator.translate.ru",   "title": "Перевести на русский" },
-      { "command": "codeTranslator.translate.pt",   "title": "Traduzir para português" },
+      {
+        "command": "codeTranslator.translate.zhCN",
+        "title": "翻译为简体中文"
+      },
+      {
+        "command": "codeTranslator.translate.zhTW",
+        "title": "翻譯為繁體中文"
+      },
+      {
+        "command": "codeTranslator.translate.en",
+        "title": "Translate to English"
+      },
+      {
+        "command": "codeTranslator.translate.ja",
+        "title": "日本語に翻訳"
+      },
+      {
+        "command": "codeTranslator.translate.ko",
+        "title": "한국어로 번역"
+      },
+      {
+        "command": "codeTranslator.translate.fr",
+        "title": "Traduire en français"
+      },
+      {
+        "command": "codeTranslator.translate.de",
+        "title": "Ins Deutsche übersetzen"
+      },
+      {
+        "command": "codeTranslator.translate.es",
+        "title": "Traducir al español"
+      },
+      {
+        "command": "codeTranslator.translate.it",
+        "title": "Traduci in italiano"
+      },
+      {
+        "command": "codeTranslator.translate.ru",
+        "title": "Перевести на русский"
+      },
+      {
+        "command": "codeTranslator.translate.pt",
+        "title": "Traduzir para português"
+      },
       {
         "command": "codeTranslator.showDetails",
         "title": "查看翻译详情"
       },
-      
       {
         "command": "codeTranslator.clear",
         "title": "清除翻译"
@@ -66,17 +98,61 @@
     ],
     "menus": {
       "editor/context": [
-        { "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isZhCN", "command": "codeTranslator.translate.zhCN", "group": "navigation" },
-        { "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isZhTW", "command": "codeTranslator.translate.zhTW", "group": "navigation" },
-        { "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isEn",   "command": "codeTranslator.translate.en",   "group": "navigation" },
-        { "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isJa",   "command": "codeTranslator.translate.ja",   "group": "navigation" },
-        { "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isKo",   "command": "codeTranslator.translate.ko",   "group": "navigation" },
-        { "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isFr",   "command": "codeTranslator.translate.fr",   "group": "navigation" },
-        { "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isDe",   "command": "codeTranslator.translate.de",   "group": "navigation" },
-        { "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isEs",   "command": "codeTranslator.translate.es",   "group": "navigation" },
-        { "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isIt",   "command": "codeTranslator.translate.it",   "group": "navigation" },
-        { "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isRu",   "command": "codeTranslator.translate.ru",   "group": "navigation" },
-        { "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isPt",   "command": "codeTranslator.translate.pt",   "group": "navigation" }
+        {
+          "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isZhCN",
+          "command": "codeTranslator.translate.zhCN",
+          "group": "navigation"
+        },
+        {
+          "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isZhTW",
+          "command": "codeTranslator.translate.zhTW",
+          "group": "navigation"
+        },
+        {
+          "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isEn",
+          "command": "codeTranslator.translate.en",
+          "group": "navigation"
+        },
+        {
+          "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isJa",
+          "command": "codeTranslator.translate.ja",
+          "group": "navigation"
+        },
+        {
+          "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isKo",
+          "command": "codeTranslator.translate.ko",
+          "group": "navigation"
+        },
+        {
+          "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isFr",
+          "command": "codeTranslator.translate.fr",
+          "group": "navigation"
+        },
+        {
+          "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isDe",
+          "command": "codeTranslator.translate.de",
+          "group": "navigation"
+        },
+        {
+          "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isEs",
+          "command": "codeTranslator.translate.es",
+          "group": "navigation"
+        },
+        {
+          "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isIt",
+          "command": "codeTranslator.translate.it",
+          "group": "navigation"
+        },
+        {
+          "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isRu",
+          "command": "codeTranslator.translate.ru",
+          "group": "navigation"
+        },
+        {
+          "when": "editorHasSelection && config.codeTranslator.showInContextMenu && codeTranslator.lang.isPt",
+          "command": "codeTranslator.translate.pt",
+          "group": "navigation"
+        }
       ]
     },
     "configuration": {
@@ -100,10 +176,10 @@
             "Google Translate - 支持100+语言",
             "DeepL - 高质量翻译（支持免费版和专业版）",
             "微软翻译 - 支持60+语言",
-            "OpenAI GPT‑4o mini - 高性价比多模态（需要 API Key）",
-            "Google Gemini 2.5 Flash - 多模态低延迟（需要 API Key）",
-            "DeepSeek v3.1 - 强大语言模型翻译（需要 API Key）",
-            "OpenRouter - 统一 OpenAI 兼容网关，自选模型（需 Key，可选 Referer/Title）",
+            "OpenAI - 模型从官方接口实时获取并选择（需要 API Key）",
+            "Google Gemini - 模型从官方接口实时获取并选择（需要 API Key）",
+            "DeepSeek - 模型从官方接口实时获取并选择（需要 API Key）",
+            "OpenRouter - 统一 OpenAI 兼容网关，模型目录公开可选（需要 API Key）",
             "自定义 OpenAI 兼容 - 任意 Chat Completions 基址 + 模型 + Key",
             "自定义 Anthropic 兼容 - 任意 Messages API 端点 + 模型 + Key"
           ],
@@ -174,22 +250,27 @@
         "codeTranslator.googleApiKey": {
           "type": "string",
           "default": "",
-          "description": "Google Translate API Key"
+          "markdownDescription": "**已弃用**：API Key 现存于系统密钥存储，请在「Translator2077 设置」面板中填写。此处仅用于自动迁移旧配置。"
         },
         "codeTranslator.deeplApiKey": {
           "type": "string",
           "default": "",
-          "description": "DeepL API Key (免费版以':fx'结尾)"
+          "markdownDescription": "**已弃用**：API Key 现存于系统密钥存储，请在「Translator2077 设置」面板中填写。此处仅用于自动迁移旧配置。"
         },
         "codeTranslator.microsoftApiKey": {
           "type": "string",
           "default": "",
-          "description": "微软翻译 API Key"
+          "markdownDescription": "**已弃用**：API Key 现存于系统密钥存储，请在「Translator2077 设置」面板中填写。此处仅用于自动迁移旧配置。"
         },
         "codeTranslator.openaiApiKey": {
           "type": "string",
           "default": "",
-          "description": "OpenAI API Key（用于 GPT‑4o mini）"
+          "markdownDescription": "**已弃用**：API Key 现存于系统密钥存储，请在「Translator2077 设置」面板中填写。此处仅用于自动迁移旧配置。"
+        },
+        "codeTranslator.openaiModel": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI 模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
         },
         "codeTranslator.microsoftRegion": {
           "type": "string",
@@ -199,37 +280,37 @@
         "codeTranslator.geminiApiKey": {
           "type": "string",
           "default": "",
-          "description": "Google AI Studio API Key（用于 Gemini 2.5 Flash）"
+          "markdownDescription": "**已弃用**：API Key 现存于系统密钥存储，请在「Translator2077 设置」面板中填写。此处仅用于自动迁移旧配置。"
+        },
+        "codeTranslator.geminiModel": {
+          "type": "string",
+          "default": "",
+          "description": "Gemini 模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
         },
         "codeTranslator.deepseekApiKey": {
           "type": "string",
           "default": "",
-          "description": "DeepSeek API Key（用于 DeepSeek v3.1）"
+          "markdownDescription": "**已弃用**：API Key 现存于系统密钥存储，请在「Translator2077 设置」面板中填写。此处仅用于自动迁移旧配置。"
+        },
+        "codeTranslator.deepseekModel": {
+          "type": "string",
+          "default": "",
+          "description": "DeepSeek 模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
         },
         "codeTranslator.openrouterApiKey": {
           "type": "string",
           "default": "",
-          "description": "OpenRouter API Key（https://openrouter.ai/keys）"
+          "markdownDescription": "**已弃用**：API Key 现存于系统密钥存储，请在「Translator2077 设置」面板中填写。此处仅用于自动迁移旧配置。"
         },
         "codeTranslator.openrouterModel": {
           "type": "string",
-          "default": "openai/gpt-4o-mini",
-          "description": "OpenRouter 模型 ID（如 openai/gpt-4o-mini、anthropic/claude-3.5-sonnet）"
-        },
-        "codeTranslator.openrouterSiteUrl": {
-          "type": "string",
           "default": "",
-          "description": "可选：HTTP-Referer（公开站点 URL，用于 OpenRouter 排行统计）"
-        },
-        "codeTranslator.openrouterSiteTitle": {
-          "type": "string",
-          "default": "Translator2077",
-          "description": "可选：X-OpenRouter-Title（应用名称，用于 OpenRouter 统计）"
+          "description": "OpenRouter 模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
         },
         "codeTranslator.customOpenAIApiKey": {
           "type": "string",
           "default": "",
-          "description": "自定义 OpenAI 兼容接口 API Key（Bearer）"
+          "markdownDescription": "**已弃用**：API Key 现存于系统密钥存储，请在「Translator2077 设置」面板中填写。此处仅用于自动迁移旧配置。"
         },
         "codeTranslator.customOpenAIBaseUrl": {
           "type": "string",
@@ -238,13 +319,13 @@
         },
         "codeTranslator.customOpenAIModel": {
           "type": "string",
-          "default": "gpt-4o-mini",
-          "description": "自定义 OpenAI 兼容接口使用的模型名"
+          "default": "",
+          "description": "自定义 OpenAI 兼容接口模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
         },
         "codeTranslator.customAnthropicApiKey": {
           "type": "string",
           "default": "",
-          "description": "Anthropic 兼容接口 API Key（x-api-key）"
+          "markdownDescription": "**已弃用**：API Key 现存于系统密钥存储，请在「Translator2077 设置」面板中填写。此处仅用于自动迁移旧配置。"
         },
         "codeTranslator.customAnthropicBaseUrl": {
           "type": "string",
@@ -253,8 +334,8 @@
         },
         "codeTranslator.customAnthropicModel": {
           "type": "string",
-          "default": "claude-3-5-haiku-20241022",
-          "description": "Anthropic 兼容接口模型 ID"
+          "default": "",
+          "description": "Anthropic 兼容接口模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
         },
         "codeTranslator.customAnthropicVersion": {
           "type": "string",
@@ -280,7 +361,6 @@
           "maximum": 10000,
           "description": "单次翻译的最大字符数"
         },
-        
         "codeTranslator.minWordLength": {
           "type": "number",
           "default": 3,
@@ -288,8 +368,6 @@
           "maximum": 10,
           "description": "最小翻译单词长度（字符数）"
         },
-        
-        
         "codeTranslator.autoHideTranslation": {
           "type": "boolean",
           "default": true,
@@ -307,13 +385,12 @@
           "default": true,
           "description": "启用划词选中文本翻译"
         },
-        
         "codeTranslator.clickTranslateMode": {
           "type": "string",
           "default": "single",
           "enum": [
             "none",
-            "single", 
+            "single",
             "double"
           ],
           "enumDescriptions": [
@@ -331,7 +408,10 @@
         "codeTranslator.detailsDisplayMode": {
           "type": "string",
           "default": "system",
-          "enum": ["system", "panel"],
+          "enum": [
+            "system",
+            "panel"
+          ],
           "enumDescriptions": [
             "系统弹窗（模态对话框）",
             "独立面板（支持固定宽度与滚动）"
@@ -360,6 +440,6 @@
     "typescript": "^4.9.3"
   },
   "dependencies": {
-    "axios": "^1.14.0"
+    "axios": "^1.19.0"
   }
 }

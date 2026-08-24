@@ -1,4 +1,12 @@
 import axios from 'axios';
+import { normalizeOpenAiModelsUrl, normalizeAnthropicModelsUrl } from './modelCatalog';
+
+/** 大模型提供商不再内置默认模型，未选择时用这条提示引导用户去设置面板 */
+export const MODEL_NOT_SELECTED = '尚未选择模型，请打开 Translator2077 设置面板选择一个模型';
+
+/** OpenRouter 归属头：标识的是本扩展而非使用者，因此固定不可配置 */
+const OPENROUTER_APP_URL = 'https://github.com/lwnb2077/Translater2077';
+const OPENROUTER_APP_NAME = 'Translator2077';
 
 export class GoogleTranslator {
     name = 'google';
@@ -223,29 +231,28 @@ export class GoogleTranslator {
     }
 }
 
-// OpenAI GPT-4o mini（简化实现：Chat Completions）
+// OpenAI Chat Completions；模型由用户在设置面板中从 /v1/models 选取
 export class OpenAITranslator {
     name = 'openai';
     private apiKey: string;
     private baseUrl = 'https://api.openai.com/v1/chat/completions';
-    private model = 'gpt-4o-mini';
-    constructor(apiKey?: string) {
+    private model: string;
+    constructor(apiKey?: string, model?: string) {
         this.apiKey = apiKey || '';
+        this.model = (model || '').trim();
     }
     async translate(text: string, targetLang: string = 'zh-CN', sourceLang: string = 'auto'): Promise<string> {
         if (!this.apiKey) throw new Error('OpenAI 需要 API Key');
-        const system = `You are a professional translator. Translate the user's text into ${targetLang}. Keep meaning accurate; keep code blocks unchanged.`;
-        const resp = await axios.post(this.baseUrl, {
+        if (!this.model) throw new Error(MODEL_NOT_SELECTED);
+        const resp = await postOpenAiCompatible(this.baseUrl, {
             model: this.model,
             messages: [
-                { role: 'system', content: system },
+                { role: 'system', content: buildTranslationSystemPrompt(targetLang, sourceLang) },
                 { role: 'user', content: text }
             ],
             temperature: 0.2,
-        }, {
-            headers: { 'Authorization': `Bearer ${this.apiKey}` }
-        });
-        const out = resp.data && resp.data.choices && resp.data.choices[0] && resp.data.choices[0].message && resp.data.choices[0].message.content;
+        }, { 'Authorization': `Bearer ${this.apiKey}` }, 120000);
+        const out = extractOpenAiStyleContent(resp.data);
         if (!out) throw new Error('OpenAI 返回为空');
         return out;
     }
@@ -253,7 +260,10 @@ export class OpenAITranslator {
         try {
             if (!this.apiKey) return false;
             // 仅请求模型元数据，零成本校验权限
-            const resp = await axios.get(`https://api.openai.com/v1/models/${this.model}` as string, {
+            const url = this.model
+                ? `https://api.openai.com/v1/models/${this.model}`
+                : 'https://api.openai.com/v1/models';
+            const resp = await axios.get(url, {
                 headers: { 'Authorization': `Bearer ${this.apiKey}` }
             });
             return !!(resp.status >= 200 && resp.status < 300);
@@ -263,21 +273,28 @@ export class OpenAITranslator {
     }
 }
 
-// Google Gemini 2.5 Flash（简化实现：Generative Language API）
+// Google Gemini（Generative Language API）；模型由用户从 /v1beta/models 选取
 export class GeminiTranslator {
     name = 'gemini';
     private apiKey: string;
-    // Text-only generateContent endpoint
-    private model = 'gemini-2.5-flash';
-    constructor(apiKey?: string) { this.apiKey = apiKey || ''; }
+    private model: string;
+    constructor(apiKey?: string, model?: string) {
+        this.apiKey = apiKey || '';
+        this.model = (model || '').trim();
+    }
     async translate(text: string, targetLang: string = 'zh-CN', sourceLang: string = 'auto'): Promise<string> {
         if (!this.apiKey) throw new Error('Gemini 需要 API Key');
-        const prompt = `Translate the following text into ${targetLang}. Keep code blocks unchanged.\n\n${text}`;
+        if (!this.model) throw new Error(MODEL_NOT_SELECTED);
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`;
+        // Gemini 有原生 systemInstruction 字段，指令不该混进用户内容里
         const resp = await axios.post(url, {
-            contents: [{ parts: [{ text: prompt }] }]
-        });
-        const out = resp.data && resp.data.candidates && resp.data.candidates[0] && resp.data.candidates[0].content && resp.data.candidates[0].content.parts && resp.data.candidates[0].content.parts[0] && resp.data.candidates[0].content.parts[0].text;
+            systemInstruction: {
+                parts: [{ text: buildTranslationSystemPrompt(targetLang, sourceLang) }]
+            },
+            contents: [{ role: 'user', parts: [{ text }] }],
+            generationConfig: { temperature: 0.2 }
+        }, { timeout: 120000 });
+        const out = resp.data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (!out) throw new Error('Gemini 返回为空');
         return out;
     }
@@ -285,7 +302,9 @@ export class GeminiTranslator {
         try {
             if (!this.apiKey) return false;
             // 查询模型描述以验证 key 可用性
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}?key=${this.apiKey}`;
+            const url = this.model
+                ? `https://generativelanguage.googleapis.com/v1beta/models/${this.model}?key=${this.apiKey}`
+                : `https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKey}`;
             const resp = await axios.get(url);
             return !!(resp.status >= 200 && resp.status < 300);
         } catch {
@@ -400,30 +419,28 @@ export class DeepSeekTranslator {
     name = 'deepseek';
     private apiKey: string;
     private baseUrl = 'https://api.deepseek.com/v1/chat/completions';
-    private model = 'deepseek-chat';
-    
-    constructor(apiKey?: string) {
+    private model: string;
+
+    constructor(apiKey?: string, model?: string) {
         this.apiKey = apiKey || '';
+        this.model = (model || '').trim();
     }
-    
+
     async translate(text: string, targetLang: string = 'zh-CN', sourceLang: string = 'auto'): Promise<string> {
         if (!this.apiKey) throw new Error('DeepSeek 需要 API Key');
-        
-        const system = `You are a professional translator. Translate the user's text into ${targetLang}. Keep meaning accurate; keep code blocks unchanged. Only return the translated text without any explanation.`;
-        
+        if (!this.model) throw new Error(MODEL_NOT_SELECTED);
+
         try {
-            const response = await axios.post(this.baseUrl, {
+            const response = await postOpenAiCompatible(this.baseUrl, {
                 model: this.model,
                 messages: [
-                    { role: 'system', content: system },
+                    { role: 'system', content: buildTranslationSystemPrompt(targetLang, sourceLang) },
                     { role: 'user', content: text }
                 ],
                 temperature: 0.2,
-                max_tokens: 2048
-            }, {
-                headers: { 'Authorization': `Bearer ${this.apiKey}` }
-            });
-            
+                max_tokens: 4096
+            }, { 'Authorization': `Bearer ${this.apiKey}` }, 120000);
+
             const result = response.data?.choices?.[0]?.message?.content;
             if (!result) throw new Error('DeepSeek 返回为空');
             return result;
@@ -441,14 +458,9 @@ export class DeepSeekTranslator {
     async testConnection(): Promise<boolean> {
         try {
             if (!this.apiKey) return false;
-            
-            const response = await axios.post(this.baseUrl, {
-                model: this.model,
-                messages: [
-                    { role: 'user', content: 'test' }
-                ],
-                max_tokens: 10
-            }, {
+
+            // 列模型即可验证 Key，不消耗额度，也不依赖是否已选模型
+            const response = await axios.get('https://api.deepseek.com/models', {
                 headers: { 'Authorization': `Bearer ${this.apiKey}` }
             });
             
@@ -483,9 +495,41 @@ export function normalizeAnthropicMessagesUrl(input: string): string {
     return `${raw}/messages`;
 }
 
-function buildTranslationSystemPrompt(targetLang: string, sourceLang: string): string {
-    const src = sourceLang === 'auto' ? 'the detected source language' : sourceLang;
-    return `You are a professional translator for software developers. Translate the user's text into ${targetLang}. Source context: ${src}. Preserve code blocks, identifiers, and markup; keep meaning accurate. Output only the translated text, no explanations.`;
+/**
+ * 所有大模型提供商共用的系统提示词。
+ * 刻意保持简短：约束越少越不容易被模型当成对话内容，也更省 token。
+ */
+export function buildTranslationSystemPrompt(targetLang: string, sourceLang: string): string {
+    const from = sourceLang && sourceLang !== 'auto' ? ` from ${sourceLang}` : '';
+    return [
+        `Translate the user's text${from} into ${targetLang}.`,
+        'Keep code, identifiers, URLs and markup unchanged.',
+        'Output only the translation, with no quotes or explanation.',
+    ].join(' ');
+}
+
+/**
+ * 新一代模型（o 系列、GPT-5 等）不再接受 temperature / max_tokens。
+ * 先按常规参数请求，遇到参数不被支持的 400 再退回最小请求体重试一次。
+ */
+async function postOpenAiCompatible(
+    url: string,
+    body: Record<string, any>,
+    headers: Record<string, string>,
+    timeout: number
+): Promise<any> {
+    try {
+        return await axios.post(url, body, { headers, timeout });
+    } catch (error: any) {
+        const status = error?.response?.status;
+        const detail = JSON.stringify(error?.response?.data ?? '');
+        const rejectsParam = status === 400 && /temperature|max_tokens|max_completion_tokens|unsupported/i.test(detail);
+        if (!rejectsParam) {
+            throw error;
+        }
+        const { temperature, max_tokens, ...minimal } = body;
+        return await axios.post(url, minimal, { headers, timeout });
+    }
 }
 
 function extractOpenAiStyleContent(data: any): string | null {
@@ -510,51 +554,50 @@ function extractAnthropicMessageText(data: any): string | null {
     return parts.length ? parts.join('') : null;
 }
 
-/** OpenRouter：OpenAI 兼容 Chat Completions，鉴权为 Bearer；可选 HTTP-Referer、X-OpenRouter-Title（官方推荐用于排行与统计） */
+/**
+ * OpenRouter：OpenAI 兼容 Chat Completions，鉴权为 Bearer。
+ * HTTP-Referer / X-OpenRouter-Title 是标识「本扩展」的归属头，与用户无关，因此固定写死，不暴露为设置项。
+ */
 export class OpenRouterTranslator {
     name = 'openrouter';
     private readonly endpoint = 'https://openrouter.ai/api/v1/chat/completions';
     private apiKey: string;
     private model: string;
-    private siteUrl: string;
-    private siteTitle: string;
 
-    constructor(apiKey?: string, model?: string, siteUrl?: string, siteTitle?: string) {
+    constructor(apiKey?: string, model?: string) {
         this.apiKey = apiKey || '';
-        this.model = (model || 'openai/gpt-4o-mini').trim();
-        this.siteUrl = (siteUrl || '').trim();
-        this.siteTitle = (siteTitle || 'Translater2077').trim() || 'Translater2077';
+        this.model = (model || '').trim();
     }
 
     private headers(): Record<string, string> {
-        const h: Record<string, string> = {
+        return {
             Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
+            'HTTP-Referer': OPENROUTER_APP_URL,
+            'X-OpenRouter-Title': OPENROUTER_APP_NAME,
         };
-        if (this.siteUrl) {
-            h['HTTP-Referer'] = this.siteUrl;
-        }
-        h['X-OpenRouter-Title'] = this.siteTitle;
-        return h;
     }
 
     async translate(text: string, targetLang: string = 'zh-CN', sourceLang: string = 'auto'): Promise<string> {
         if (!this.apiKey) {
             throw new Error('OpenRouter 需要 API Key');
         }
-        const system = buildTranslationSystemPrompt(targetLang, sourceLang);
-        const resp = await axios.post(
+        if (!this.model) {
+            throw new Error(MODEL_NOT_SELECTED);
+        }
+        const resp = await postOpenAiCompatible(
             this.endpoint,
             {
                 model: this.model,
                 messages: [
-                    { role: 'system', content: system },
+                    { role: 'system', content: buildTranslationSystemPrompt(targetLang, sourceLang) },
                     { role: 'user', content: text },
                 ],
                 temperature: 0.2,
                 max_tokens: 4096,
             },
-            { headers: this.headers(), timeout: 120000 }
+            this.headers(),
+            120000
         );
         const out = extractOpenAiStyleContent(resp.data);
         if (!out) {
@@ -568,15 +611,11 @@ export class OpenRouterTranslator {
             if (!this.apiKey) {
                 return false;
             }
-            const resp = await axios.post(
-                this.endpoint,
-                {
-                    model: this.model,
-                    messages: [{ role: 'user', content: 'ping' }],
-                    max_tokens: 8,
-                },
-                { headers: this.headers(), timeout: 30000 }
-            );
+            // 查询额度信息即可验证 Key，不消耗 token，也不依赖是否已选模型
+            const resp = await axios.get('https://openrouter.ai/api/v1/key', {
+                headers: this.headers(),
+                timeout: 30000,
+            });
             return resp.status >= 200 && resp.status < 300;
         } catch {
             return false;
@@ -594,32 +633,32 @@ export class OpenAICompatibleTranslator {
     constructor(apiKey?: string, baseUrl?: string, model?: string) {
         this.apiKey = apiKey || '';
         this.chatUrl = normalizeOpenAiChatCompletionsUrl(baseUrl || 'https://api.openai.com/v1');
-        this.model = (model || 'gpt-4o-mini').trim();
+        this.model = (model || '').trim();
     }
 
     async translate(text: string, targetLang: string = 'zh-CN', sourceLang: string = 'auto'): Promise<string> {
         if (!this.apiKey) {
             throw new Error('自定义 OpenAI 兼容接口需要 API Key');
         }
-        const system = buildTranslationSystemPrompt(targetLang, sourceLang);
-        const resp = await axios.post(
+        if (!this.model) {
+            throw new Error(MODEL_NOT_SELECTED);
+        }
+        const resp = await postOpenAiCompatible(
             this.chatUrl,
             {
                 model: this.model,
                 messages: [
-                    { role: 'system', content: system },
+                    { role: 'system', content: buildTranslationSystemPrompt(targetLang, sourceLang) },
                     { role: 'user', content: text },
                 ],
                 temperature: 0.2,
                 max_tokens: 4096,
             },
             {
-                headers: {
-                    Authorization: `Bearer ${this.apiKey}`,
-                    'Content-Type': 'application/json',
-                },
-                timeout: 120000,
-            }
+                Authorization: `Bearer ${this.apiKey}`,
+                'Content-Type': 'application/json',
+            },
+            120000
         );
         const out = extractOpenAiStyleContent(resp.data);
         if (!out) {
@@ -633,21 +672,11 @@ export class OpenAICompatibleTranslator {
             if (!this.apiKey) {
                 return false;
             }
-            const resp = await axios.post(
-                this.chatUrl,
-                {
-                    model: this.model,
-                    messages: [{ role: 'user', content: 'ok' }],
-                    max_tokens: 5,
-                },
-                {
-                    headers: {
-                        Authorization: `Bearer ${this.apiKey}`,
-                        'Content-Type': 'application/json',
-                    },
-                    timeout: 30000,
-                }
-            );
+            // 列模型即可验证 Key 与 Base URL，不消耗额度，也不依赖是否已选模型
+            const resp = await axios.get(normalizeOpenAiModelsUrl(this.chatUrl), {
+                headers: { Authorization: `Bearer ${this.apiKey}` },
+                timeout: 30000,
+            });
             return resp.status >= 200 && resp.status < 300;
         } catch {
             return false;
@@ -666,7 +695,7 @@ export class AnthropicCompatibleTranslator {
     constructor(apiKey?: string, baseUrl?: string, model?: string, anthropicVersion?: string) {
         this.apiKey = apiKey || '';
         this.messagesUrl = normalizeAnthropicMessagesUrl(baseUrl || 'https://api.anthropic.com/v1/messages');
-        this.model = (model || 'claude-3-5-haiku-20241022').trim();
+        this.model = (model || '').trim();
         this.anthropicVersion = (anthropicVersion || '2023-06-01').trim();
     }
 
@@ -674,13 +703,15 @@ export class AnthropicCompatibleTranslator {
         if (!this.apiKey) {
             throw new Error('Anthropic 兼容接口需要 API Key');
         }
-        const system = buildTranslationSystemPrompt(targetLang, sourceLang);
+        if (!this.model) {
+            throw new Error(MODEL_NOT_SELECTED);
+        }
         const resp = await axios.post(
             this.messagesUrl,
             {
                 model: this.model,
                 max_tokens: 4096,
-                system,
+                system: buildTranslationSystemPrompt(targetLang, sourceLang),
                 messages: [{ role: 'user', content: text }],
             },
             {
@@ -704,22 +735,14 @@ export class AnthropicCompatibleTranslator {
             if (!this.apiKey) {
                 return false;
             }
-            const resp = await axios.post(
-                this.messagesUrl,
-                {
-                    model: this.model,
-                    max_tokens: 12,
-                    messages: [{ role: 'user', content: 'hi' }],
+            // 列模型即可验证 Key 与 Base URL，不消耗额度，也不依赖是否已选模型
+            const resp = await axios.get(normalizeAnthropicModelsUrl(this.messagesUrl), {
+                headers: {
+                    'x-api-key': this.apiKey,
+                    'anthropic-version': this.anthropicVersion,
                 },
-                {
-                    headers: {
-                        'x-api-key': this.apiKey,
-                        'anthropic-version': this.anthropicVersion,
-                        'Content-Type': 'application/json',
-                    },
-                    timeout: 30000,
-                }
-            );
+                timeout: 30000,
+            });
             return resp.status >= 200 && resp.status < 300;
         } catch {
             return false;

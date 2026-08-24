@@ -20,7 +20,7 @@
 - 目标/源语言（源语言推荐 auto）
 - 点击翻译模式（none/single/double）、延迟、最大长度
 - 自动隐藏与时长、详情显示方式与宽度
-- 各提供商 API Key 本地配置存储
+- 各提供商 API Key 存于系统密钥存储（钥匙串），不写入 settings.json
 
 ---
 
@@ -37,7 +37,7 @@
 設定
 - 目標/來源語言、點擊翻譯模式、延遲與最大長度
 - 自動隱藏與時間、詳情顯示方式與寬度
-- API Key 只儲存在本機設定
+- API Key 儲存於系統金鑰匣，不寫入 settings.json
 
 ---
 
@@ -88,7 +88,7 @@ Settings
 - Target/source language (auto recommended for source)
 - Click‑translate mode, delay, maximum length
 - Auto‑hide & duration, details display mode & width
-- API keys stored locally in VS Code settings
+- API keys stored in the OS keychain via VS Code SecretStorage, never in settings.json
 
 ---
 
@@ -97,14 +97,14 @@ Settings
 在开始之前，请确保已安装 [Node.js](https://nodejs.org/) 16+ 与 npm。
 
 ### 方法一：下载 .vsix 文件安装
-1. 从本仓库或 Releases 页面下载 `Translator2077-1.2.1.vsix` 文件  
+1. 从本仓库或 Releases 页面下载 `Translator2077-1.3.0.vsix` 文件  
 2. 打开 VS Code / Cursor  
 3. 按 `Ctrl+Shift+P`（Windows/Linux）或 `Cmd+Shift+P`（Mac）  
 4. 输入 “Extensions: Install from VSIX”  
 5. 选择下载的 .vsix 文件完成安装  
 
 ### Method 1: Install from .vsix file
-1. Download `Translator2077-1.2.1.vsix` from this repository or the releases page  
+1. Download `Translator2077-1.3.0.vsix` from this repository or the releases page  
 2. Open VS Code / Cursor  
 3. Press `Ctrl+Shift+P` (Windows/Linux) or `Cmd+Shift+P` (Mac)  
 4. Type “Extensions: Install from VSIX”  
@@ -119,7 +119,7 @@ npm run compile    # 生成 out/ 目录
 # 可选：npx vsce package  # 打包 VSIX
 ```
 
-构建完成后，可按上述步骤安装生成的 `.vsix`。所有翻译服务的 API Key **不会**附带在仓库中，请在 VS Code 设置中自行配置，密钥仅保存在本地。
+构建完成后，可按上述步骤安装生成的 `.vsix`。所有翻译服务的 API Key **不会**附带在仓库中，请在扩展的「打开设置」面板中自行填写；密钥保存在系统钥匙串（VS Code SecretStorage），不会写入 settings.json，也不会被 Settings Sync 同步到云端。
 
 ---
 

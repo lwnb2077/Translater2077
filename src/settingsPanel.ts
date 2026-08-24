@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { SecretStore } from './secretStore';
+import { listModels } from './modelCatalog';
 
 export class SettingsPanel {
     public static currentPanel: SettingsPanel | undefined;
@@ -56,6 +58,9 @@ export class SettingsPanel {
                     case 'testConnection':
                         await this._testConnection(message.provider, message.apiKey, message.extras || {});
                         break;
+                    case 'fetchModels':
+                        await this._fetchModels(message.provider, message.apiKey, message.extras || {});
+                        break;
                     case 'openVSCodeSettings':
                         await this._openVSCodeSettings(message.setting);
                         break;
@@ -100,10 +105,11 @@ export class SettingsPanel {
             await config.update('detailsDisplayMode', settings.detailsDisplayMode, vscode.ConfigurationTarget.Global);
             await config.update('detailsPanelWidth', settings.detailsPanelWidth, vscode.ConfigurationTarget.Global);
             
-            // 保存API密钥（敏感信息）
+            // API 密钥写入系统密钥存储，绝不落进 settings.json
             if (settings.apiKeys) {
+                const store = SecretStore.get();
                 for (const [provider, apiKey] of Object.entries(settings.apiKeys)) {
-                    await config.update(`${provider}ApiKey`, apiKey, vscode.ConfigurationTarget.Global);
+                    await store.setKey(provider, typeof apiKey === 'string' ? apiKey : '');
                 }
             }
 
@@ -111,14 +117,10 @@ export class SettingsPanel {
             if (typeof settings.microsoftRegion === 'string') {
                 await config.update('microsoftRegion', settings.microsoftRegion, vscode.ConfigurationTarget.Global);
             }
-            if (typeof settings.openrouterModel === 'string') {
-                await config.update('openrouterModel', settings.openrouterModel, vscode.ConfigurationTarget.Global);
-            }
-            if (typeof settings.openrouterSiteUrl === 'string') {
-                await config.update('openrouterSiteUrl', settings.openrouterSiteUrl, vscode.ConfigurationTarget.Global);
-            }
-            if (typeof settings.openrouterSiteTitle === 'string') {
-                await config.update('openrouterSiteTitle', settings.openrouterSiteTitle, vscode.ConfigurationTarget.Global);
+            for (const field of ['openaiModel', 'geminiModel', 'deepseekModel', 'openrouterModel'] as const) {
+                if (typeof settings[field] === 'string') {
+                    await config.update(field, settings[field], vscode.ConfigurationTarget.Global);
+                }
             }
             if (typeof settings.customOpenAIBaseUrl === 'string') {
                 await config.update('customOpenAIBaseUrl', settings.customOpenAIBaseUrl, vscode.ConfigurationTarget.Global);
@@ -135,6 +137,10 @@ export class SettingsPanel {
             if (typeof settings.customAnthropicVersion === 'string') {
                 await config.update('customAnthropicVersion', settings.customAnthropicVersion, vscode.ConfigurationTarget.Global);
             }
+
+            // Key 存在 SecretStorage 而非配置里，改 Key 不会触发 onDidChangeConfiguration，
+            // 因此保存后必须主动通知扩展重建提供商，否则旧 Key 会一直用到下次重启。
+            await vscode.commands.executeCommand('codeTranslator.internal.reloadProvider');
 
             this._panel.webview.postMessage({
                 type: 'settingsSaved',
@@ -173,26 +179,18 @@ export class SettingsPanel {
             showInContextMenu: config.get('showInContextMenu', true),
             detailsDisplayMode: config.get('detailsDisplayMode', 'system'),
             detailsPanelWidth: config.get('detailsPanelWidth', 800),
-            apiKeys: {
-                google: config.get('googleApiKey', ''),
-                deepl: config.get('deeplApiKey', ''),
-                microsoft: config.get('microsoftApiKey', ''),
-                openai: config.get('openaiApiKey', ''),
-                gemini: config.get('geminiApiKey', ''),
-                deepseek: config.get('deepseekApiKey', ''),
-                openrouter: config.get('openrouterApiKey', ''),
-                customOpenAI: config.get('customOpenAIApiKey', ''),
-                customAnthropic: config.get('customAnthropicApiKey', '')
-            },
-            // 扩展提供商参数
+            // Key 来自系统密钥存储
+            apiKeys: await SecretStore.get().getAllKeys(),
+            // 扩展提供商参数；模型一律不预设默认值，由用户从远程列表中选取
             microsoftRegion: config.get('microsoftRegion', 'global'),
-            openrouterModel: config.get('openrouterModel', 'openai/gpt-4o-mini'),
-            openrouterSiteUrl: config.get('openrouterSiteUrl', ''),
-            openrouterSiteTitle: config.get('openrouterSiteTitle', 'Translater2077'),
+            openaiModel: config.get('openaiModel', ''),
+            geminiModel: config.get('geminiModel', ''),
+            deepseekModel: config.get('deepseekModel', ''),
+            openrouterModel: config.get('openrouterModel', ''),
             customOpenAIBaseUrl: config.get('customOpenAIBaseUrl', 'https://api.openai.com/v1'),
-            customOpenAIModel: config.get('customOpenAIModel', 'gpt-4o-mini'),
+            customOpenAIModel: config.get('customOpenAIModel', ''),
             customAnthropicBaseUrl: config.get('customAnthropicBaseUrl', 'https://api.anthropic.com/v1/messages'),
-            customAnthropicModel: config.get('customAnthropicModel', 'claude-3-5-haiku-20241022'),
+            customAnthropicModel: config.get('customAnthropicModel', ''),
             customAnthropicVersion: config.get('customAnthropicVersion', '2023-06-01')
         };
 
@@ -211,9 +209,10 @@ export class SettingsPanel {
             const tm = new TranslationManager();
 
             const extraKeys = new Set([
+                'openaiModel',
+                'geminiModel',
+                'deepseekModel',
                 'openrouterModel',
-                'openrouterSiteUrl',
-                'openrouterSiteTitle',
                 'customOpenAIBaseUrl',
                 'customOpenAIModel',
                 'customAnthropicBaseUrl',
@@ -285,6 +284,29 @@ export class SettingsPanel {
         }
     }
 
+    /** 按当前表单里的 Key / Base URL 拉取该提供商可用的模型，供下拉列表使用 */
+    private async _fetchModels(provider: string, apiKey: string, extras: Record<string, string> = {}) {
+        try {
+            // 表单里没填 Key 时回落到已保存的，避免用户重开面板后还要重新粘贴
+            const key = (apiKey || '').trim() || (await SecretStore.get().getKey(provider));
+            const models = await listModels(provider, key, extras);
+            this._panel.webview.postMessage({
+                type: 'modelsFetched',
+                provider,
+                success: true,
+                models,
+            });
+        } catch (error) {
+            this._panel.webview.postMessage({
+                type: 'modelsFetched',
+                provider,
+                success: false,
+                models: [],
+                message: error instanceof Error ? error.message : String(error),
+            });
+        }
+    }
+
     private async _openVSCodeSettings(setting: string) {
         try {
             await vscode.commands.executeCommand('workbench.action.openSettings', setting);
@@ -304,6 +326,25 @@ export class SettingsPanel {
 
     private _update() {
         this._panel.webview.html = this._getHtmlForWebview();
+    }
+
+    /**
+     * 模型选择器：搜索框 + 远程拉取的下拉列表。
+     * 真实值存在隐藏 input（id=field）里，搜索框只负责显示与过滤。
+     */
+    private _renderModelPicker(provider: string, field: string): string {
+        return `
+                <div class="form-group model-picker" data-provider="${provider}" data-field="${field}">
+                    <label for="${field}_search" data-i18n="modelLabel">模型：</label>
+                    <div class="model-picker-control">
+                        <input type="text" id="${field}_search" class="model-search" autocomplete="off"
+                               data-placeholder-i18n="modelSearchPlaceholder" placeholder="点击选择，或输入关键字搜索">
+                        <button type="button" class="secondary model-refresh" data-i18n="modelRefresh">刷新列表</button>
+                    </div>
+                    <input type="hidden" id="${field}">
+                    <div class="model-dropdown hidden"></div>
+                    <p class="model-status"></p>
+                </div>`;
     }
 
     private _getHtmlForWebview() {
@@ -523,6 +564,87 @@ export class SettingsPanel {
         .hidden {
             display: none;
         }
+
+        /* ===== 模型选择器（可搜索下拉） ===== */
+        .model-picker {
+            position: relative;
+            margin-top: 10px;
+        }
+
+        .model-picker-control {
+            display: flex;
+            gap: 8px;
+            align-items: stretch;
+        }
+
+        .model-picker-control input {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .model-picker-control button {
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .model-dropdown {
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 100%;
+            margin-top: 2px;
+            max-height: 300px;
+            overflow-y: auto;
+            background: var(--vscode-dropdown-background, var(--vscode-editor-background));
+            border: 1px solid var(--vscode-dropdown-border, var(--vscode-widget-border));
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+            z-index: 900;
+        }
+
+        .model-option {
+            padding: 7px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--vscode-widget-border);
+        }
+
+        .model-option:last-child {
+            border-bottom: none;
+        }
+
+        .model-option:hover,
+        .model-option.active {
+            background: var(--vscode-list-activeSelectionBackground);
+            color: var(--vscode-list-activeSelectionForeground);
+        }
+
+        .model-option.selected .model-option-name::after {
+            content: ' ✓';
+            color: var(--vscode-charts-green, #89d185);
+        }
+
+        .model-option-name {
+            font-size: 13px;
+            word-break: break-all;
+        }
+
+        .model-option-detail {
+            font-size: 11px;
+            opacity: 0.75;
+            margin-top: 2px;
+            word-break: break-all;
+        }
+
+        .model-status {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+            margin-top: 6px;
+            min-height: 16px;
+        }
+
+        .model-status.error {
+            color: var(--vscode-errorForeground, #f48771);
+        }
     </style>
 </head>
 <body>
@@ -596,6 +718,7 @@ export class SettingsPanel {
                     <input type="text" id="openaiApiKey" data-placeholder-i18n="openaiApiKeyPlaceholder">
                     <button type="button" class="secondary test-btn" data-provider="openai" data-i18n="testConnection">测试连接</button>
                 </div>
+                ${this._renderModelPicker('openai', 'openaiModel')}
                 <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="openaiNotes">需要有效的 OpenAI 账号与 API Key，计费按使用量收取；部分地区可能无法直连，需配置代理。</p>
             </div>
             
@@ -606,6 +729,7 @@ export class SettingsPanel {
                     <input type="text" id="geminiApiKey" data-placeholder-i18n="geminiApiKeyPlaceholder">
                     <button type="button" class="secondary test-btn" data-provider="gemini" data-i18n="testConnection">测试连接</button>
                 </div>
+                ${this._renderModelPicker('gemini', 'geminiModel')}
                 <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="geminiNotes">需要在 Google AI Studio 申请 API Key；部分地区不可用或需代理，计费与配额以官方为准。</p>
             </div>
             
@@ -616,7 +740,8 @@ export class SettingsPanel {
                     <input type="text" id="deepseekApiKey" data-placeholder-i18n="deepseekApiKeyPlaceholder">
                     <button type="button" class="secondary test-btn" data-provider="deepseek" data-i18n="testConnection">测试连接</button>
                 </div>
-                <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="deepseekNotes">强大的语言模型翻译服务，使用deepseek-chat模型，需要API Key。</p>
+                ${this._renderModelPicker('deepseek', 'deepseekModel')}
+                <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="deepseekNotes">强大的语言模型翻译服务，模型列表从 DeepSeek 接口实时获取。</p>
             </div>
             
             <!-- OpenRouter -->
@@ -626,19 +751,8 @@ export class SettingsPanel {
                     <input type="password" id="openrouterApiKey" autocomplete="off">
                     <button type="button" class="secondary test-btn" data-provider="openrouter" data-i18n="testConnection">测试连接</button>
                 </div>
-                <div class="form-group" style="margin-top:10px;">
-                    <label for="openrouterModel" data-i18n="openrouterModelLabel">模型 ID：</label>
-                    <input type="text" id="openrouterModel" style="width:100%;box-sizing:border-box;" placeholder="openai/gpt-4o-mini">
-                </div>
-                <div class="form-group">
-                    <label for="openrouterSiteUrl" data-i18n="openrouterSiteUrlLabel">HTTP-Referer（可选）：</label>
-                    <input type="text" id="openrouterSiteUrl" style="width:100%;box-sizing:border-box;" placeholder="https://">
-                </div>
-                <div class="form-group">
-                    <label for="openrouterSiteTitle" data-i18n="openrouterSiteTitleLabel">X-OpenRouter-Title（可选）：</label>
-                    <input type="text" id="openrouterSiteTitle" style="width:100%;box-sizing:border-box;" placeholder="Translater2077">
-                </div>
-                <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="openrouterNotes">OpenAI 兼容 Chat Completions；鉴权 Bearer；可选 Referer/Title（OpenRouter 官方推荐）。</p>
+                ${this._renderModelPicker('openrouter', 'openrouterModel')}
+                <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="openrouterNotes">OpenAI 兼容 Chat Completions；鉴权 Bearer。模型目录公开，无需 Key 即可浏览。</p>
             </div>
             
             <!-- 自定义 OpenAI 兼容 -->
@@ -652,10 +766,7 @@ export class SettingsPanel {
                     <label for="customOpenAIBaseUrl" data-i18n="customOpenAIBaseUrlLabel">基址 URL：</label>
                     <input type="text" id="customOpenAIBaseUrl" style="width:100%;box-sizing:border-box;" placeholder="https://api.openai.com/v1">
                 </div>
-                <div class="form-group">
-                    <label for="customOpenAIModel" data-i18n="customOpenAIModelLabel">模型名：</label>
-                    <input type="text" id="customOpenAIModel" style="width:100%;box-sizing:border-box;" placeholder="gpt-4o-mini">
-                </div>
+                ${this._renderModelPicker('customOpenAI', 'customOpenAIModel')}
                 <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="customOpenAINotes">任意 OpenAI Chat Completions 兼容端点；可填 …/v1 或完整 …/chat/completions。</p>
             </div>
             
@@ -670,10 +781,7 @@ export class SettingsPanel {
                     <label for="customAnthropicBaseUrl" data-i18n="customAnthropicBaseUrlLabel">Messages URL：</label>
                     <input type="text" id="customAnthropicBaseUrl" style="width:100%;box-sizing:border-box;" placeholder="https://api.anthropic.com/v1/messages">
                 </div>
-                <div class="form-group">
-                    <label for="customAnthropicModel" data-i18n="customAnthropicModelLabel">模型 ID：</label>
-                    <input type="text" id="customAnthropicModel" style="width:100%;box-sizing:border-box;" placeholder="claude-3-5-haiku-20241022">
-                </div>
+                ${this._renderModelPicker('customAnthropic', 'customAnthropicModel')}
                 <div class="form-group">
                     <label for="customAnthropicVersion" data-i18n="customAnthropicVersionLabel">anthropic-version：</label>
                     <input type="text" id="customAnthropicVersion" style="width:100%;box-sizing:border-box;" placeholder="2023-06-01">
@@ -852,18 +960,22 @@ export class SettingsPanel {
                 "provider.customOpenAI": "自定义 OpenAI 兼容",
                 "provider.customAnthropic": "自定义 Anthropic 兼容",
                 openrouterApiKeyLabel: "OpenRouter API Key：",
-                openrouterModelLabel: "模型 ID：",
-                openrouterSiteUrlLabel: "HTTP-Referer（可选）：",
-                openrouterSiteTitleLabel: "X-OpenRouter-Title（可选）：",
-                openrouterNotes: "OpenAI 兼容 Chat Completions；Bearer 鉴权；可选 Referer/Title（OpenRouter 文档推荐）。",
+                openrouterNotes: "OpenAI 兼容 Chat Completions；Bearer 鉴权。模型目录公开，无需 Key 即可浏览。",
                 customOpenAIApiKeyLabel: "API Key（Bearer）：",
                 customOpenAIBaseUrlLabel: "基址 URL：",
-                customOpenAIModelLabel: "模型名：",
                 customOpenAINotes: "任意 OpenAI Chat Completions 兼容端点；可填 …/v1 或完整 …/chat/completions。",
                 customAnthropicApiKeyLabel: "API Key（x-api-key）：",
                 customAnthropicBaseUrlLabel: "Messages URL：",
-                customAnthropicModelLabel: "模型 ID：",
                 customAnthropicVersionLabel: "anthropic-version：",
+                modelLabel: "模型：",
+                modelSearchPlaceholder: "点击选择，或输入关键字搜索",
+                modelRefresh: "刷新列表",
+                modelLoading: "正在获取模型列表…",
+                modelCount: "共 {n} 个模型，可输入关键字筛选",
+                modelEmpty: "该接口未返回任何模型",
+                modelNoMatch: "没有匹配的模型",
+                modelSelected: "已选择：",
+                modelFetchFailed: "获取模型列表失败",
                 customAnthropicNotes: "Anthropic Messages API；第三方网关请按其文档填写 URL 与版本头。",
                 googleApiKey: "Google Translate API Key：",
                 googleApiKeyPlaceholder: "输入您的Google API密钥（可选，不填使用免费服务）",
@@ -950,18 +1062,22 @@ export class SettingsPanel {
                 "provider.customOpenAI": "Custom OpenAI-compatible",
                 "provider.customAnthropic": "Custom Anthropic-compatible",
                 openrouterApiKeyLabel: "OpenRouter API Key:",
-                openrouterModelLabel: "Model ID:",
-                openrouterSiteUrlLabel: "HTTP-Referer (optional):",
-                openrouterSiteTitleLabel: "X-OpenRouter-Title (optional):",
-                openrouterNotes: "OpenAI-compatible Chat Completions; Bearer auth; optional Referer/Title per OpenRouter docs.",
+                openrouterNotes: "OpenAI-compatible Chat Completions; Bearer auth. The model catalog is public and browsable without a key.",
                 customOpenAIApiKeyLabel: "API Key (Bearer):",
                 customOpenAIBaseUrlLabel: "Base URL:",
-                customOpenAIModelLabel: "Model:",
                 customOpenAINotes: "Any OpenAI Chat Completions-compatible endpoint; use …/v1 or full …/chat/completions.",
                 customAnthropicApiKeyLabel: "API Key (x-api-key):",
                 customAnthropicBaseUrlLabel: "Messages URL:",
-                customAnthropicModelLabel: "Model ID:",
                 customAnthropicVersionLabel: "anthropic-version:",
+                modelLabel: "Model:",
+                modelSearchPlaceholder: "Click to choose, or type to search",
+                modelRefresh: "Refresh",
+                modelLoading: "Fetching model list…",
+                modelCount: "{n} models available — type to filter",
+                modelEmpty: "This endpoint returned no models",
+                modelNoMatch: "No matching model",
+                modelSelected: "Selected: ",
+                modelFetchFailed: "Failed to fetch model list",
                 customAnthropicNotes: "Anthropic Messages API; for third-party proxies follow their URL and version header docs.",
                 googleApiKey: "Google Translate API Key:",
                 googleApiKeyPlaceholder: "Enter your Google API key (optional, uses free service if empty)",
@@ -1048,18 +1164,22 @@ export class SettingsPanel {
                 "provider.customOpenAI": "カスタム OpenAI 互換",
                 "provider.customAnthropic": "カスタム Anthropic 互換",
                 openrouterApiKeyLabel: "OpenRouter APIキー：",
-                openrouterModelLabel: "モデル ID：",
-                openrouterSiteUrlLabel: "HTTP-Referer（任意）：",
-                openrouterSiteTitleLabel: "X-OpenRouter-Title（任意）：",
-                openrouterNotes: "OpenAI 互換 Chat Completions。Bearer 認証。Referer/Title は OpenRouter 推奨。",
+                openrouterNotes: "OpenAI 互換 Chat Completions。Bearer 認証。モデル一覧は公開され、キーなしで閲覧できます。",
                 customOpenAIApiKeyLabel: "APIキー（Bearer）：",
                 customOpenAIBaseUrlLabel: "ベース URL：",
-                customOpenAIModelLabel: "モデル名：",
                 customOpenAINotes: "OpenAI Chat Completions 互換の任意エンドポイント。…/v1 または完全な …/chat/completions。",
                 customAnthropicApiKeyLabel: "APIキー（x-api-key）：",
                 customAnthropicBaseUrlLabel: "Messages URL：",
-                customAnthropicModelLabel: "モデル ID：",
                 customAnthropicVersionLabel: "anthropic-version：",
+                modelLabel: "モデル：",
+                modelSearchPlaceholder: "クリックして選択、または入力して検索",
+                modelRefresh: "更新",
+                modelLoading: "モデル一覧を取得中…",
+                modelCount: "{n} 件のモデル — 入力で絞り込み",
+                modelEmpty: "このエンドポイントはモデルを返しませんでした",
+                modelNoMatch: "一致するモデルがありません",
+                modelSelected: "選択済み：",
+                modelFetchFailed: "モデル一覧の取得に失敗しました",
                 customAnthropicNotes: "Anthropic Messages API。サードパーティは各ドキュメントに従ってください。",
                 googleApiKey: "Google翻訳APIキー：",
                 googleApiKeyPlaceholder: "GoogleのAPIキーを入力（オプション、空の場合無料サービスを使用）",
@@ -1278,10 +1398,207 @@ export class SettingsPanel {
                     }
                     break;
                 case 'connectionTested':
-                    showMessage(message.success ? 'success' : 'error', 
+                    showMessage(message.success ? 'success' : 'error',
                                message.provider.toUpperCase() + ': ' + message.message);
                     break;
+                case 'modelsFetched':
+                    onModelsFetched(message);
+                    break;
             }
+        });
+
+        // ===================== 模型选择器 =====================
+        // 每个提供商缓存一份模型列表，避免每次展开都打一次网络请求
+        const modelCache = {};
+        const modelLoading = {};
+
+        function pickerOf(field) {
+            return document.querySelector('.model-picker[data-field="' + field + '"]');
+        }
+
+        function pickerParts(picker) {
+            return {
+                field: picker.dataset.field,
+                provider: picker.dataset.provider,
+                search: picker.querySelector('.model-search'),
+                hidden: picker.querySelector('input[type="hidden"]'),
+                dropdown: picker.querySelector('.model-dropdown'),
+                status: picker.querySelector('.model-status'),
+            };
+        }
+
+        function t(key, fallback) {
+            const resources = i18nResources[currentLanguage] || i18nResources.zh;
+            return resources[key] || fallback;
+        }
+
+        /** 回填已保存的模型：隐藏域存真值，搜索框显示同样的文本 */
+        function setPickerValue(field, value) {
+            const picker = pickerOf(field);
+            if (!picker) { return; }
+            const p = pickerParts(picker);
+            p.hidden.value = value || '';
+            p.search.value = value || '';
+        }
+
+        /** 收集自定义端点的 Base URL 等参数，拉取模型时需要 */
+        function pickerExtras(provider) {
+            if (provider === 'customOpenAI') {
+                return { customOpenAIBaseUrl: document.getElementById('customOpenAIBaseUrl')?.value || '' };
+            }
+            if (provider === 'customAnthropic') {
+                return {
+                    customAnthropicBaseUrl: document.getElementById('customAnthropicBaseUrl')?.value || '',
+                    customAnthropicVersion: document.getElementById('customAnthropicVersion')?.value || ''
+                };
+            }
+            return {};
+        }
+
+        function requestModels(provider, field) {
+            if (modelLoading[field]) { return; }
+            modelLoading[field] = true;
+
+            const picker = pickerOf(field);
+            const p = pickerParts(picker);
+            p.status.classList.remove('error');
+            p.status.textContent = t('modelLoading', '正在获取模型列表…');
+
+            vscode.postMessage({
+                type: 'fetchModels',
+                provider: provider,
+                apiKey: document.getElementById(provider + 'ApiKey')?.value || '',
+                extras: pickerExtras(provider)
+            });
+        }
+
+        function onModelsFetched(message) {
+            // 一个提供商对应一个选择器，按 provider 反查 field
+            const picker = document.querySelector('.model-picker[data-provider="' + message.provider + '"]');
+            if (!picker) { return; }
+            const p = pickerParts(picker);
+            modelLoading[p.field] = false;
+
+            if (!message.success) {
+                p.status.classList.add('error');
+                p.status.textContent = message.message || t('modelFetchFailed', '获取模型列表失败');
+                return;
+            }
+
+            modelCache[p.field] = message.models || [];
+            p.status.classList.remove('error');
+            if (!modelCache[p.field].length) {
+                p.status.textContent = t('modelEmpty', '该接口未返回任何模型');
+            } else {
+                p.status.textContent = t('modelCount', '共 {n} 个模型').replace('{n}', modelCache[p.field].length);
+            }
+            renderOptions(p, p.search.value === p.hidden.value ? '' : p.search.value);
+        }
+
+        function renderOptions(p, filter) {
+            const all = modelCache[p.field] || [];
+            const q = (filter || '').trim().toLowerCase();
+            const matched = q
+                ? all.filter(m => m.id.toLowerCase().includes(q) || (m.label || '').toLowerCase().includes(q))
+                : all;
+
+            if (!matched.length) {
+                p.dropdown.innerHTML = '<div class="model-option">' + t('modelNoMatch', '没有匹配的模型') + '</div>';
+                p.dropdown.classList.remove('hidden');
+                return;
+            }
+
+            // 长列表只渲染前 300 条，输入关键字可继续收窄
+            const shown = matched.slice(0, 300);
+            p.dropdown.innerHTML = shown.map((m, i) => {
+                const selected = m.id === p.hidden.value ? ' selected' : '';
+                return '<div class="model-option' + selected + '" data-id="' + escapeAttr(m.id) + '" data-index="' + i + '">'
+                    + '<div class="model-option-name">' + escapeHtml(m.label || m.id) + '</div>'
+                    + (m.detail ? '<div class="model-option-detail">' + escapeHtml(m.detail) + '</div>' : '')
+                    + '</div>';
+            }).join('');
+            p.dropdown.classList.remove('hidden');
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[c]);
+        }
+
+        function escapeAttr(s) {
+            return escapeHtml(s);
+        }
+
+        function closeDropdown(p) {
+            p.dropdown.classList.add('hidden');
+            // 未选中任何项时，把搜索框恢复成已保存的值，避免留下半截关键字
+            p.search.value = p.hidden.value;
+        }
+
+        function selectModel(p, id) {
+            p.hidden.value = id;
+            p.search.value = id;
+            p.dropdown.classList.add('hidden');
+            p.status.classList.remove('error');
+            p.status.textContent = t('modelSelected', '已选择：') + id;
+        }
+
+        function moveActive(p, delta) {
+            const options = Array.from(p.dropdown.querySelectorAll('.model-option[data-id]'));
+            if (!options.length) { return; }
+            const current = options.findIndex(o => o.classList.contains('active'));
+            const next = Math.max(0, Math.min(options.length - 1, current < 0 ? 0 : current + delta));
+            options.forEach(o => o.classList.remove('active'));
+            options[next].classList.add('active');
+            options[next].scrollIntoView({ block: 'nearest' });
+        }
+
+        document.querySelectorAll('.model-picker').forEach(picker => {
+            const p = pickerParts(picker);
+
+            // 聚焦即展开；首次展开时自动拉取
+            p.search.addEventListener('focus', () => {
+                if (!modelCache[p.field]) {
+                    requestModels(p.provider, p.field);
+                } else {
+                    renderOptions(p, '');
+                }
+            });
+
+            p.search.addEventListener('input', () => {
+                if (modelCache[p.field]) {
+                    renderOptions(p, p.search.value);
+                }
+            });
+
+            p.search.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowDown') { e.preventDefault(); moveActive(p, 1); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); moveActive(p, -1); }
+                else if (e.key === 'Enter') {
+                    const active = p.dropdown.querySelector('.model-option.active[data-id]');
+                    if (active) { e.preventDefault(); selectModel(p, active.dataset.id); }
+                } else if (e.key === 'Escape') {
+                    closeDropdown(p);
+                }
+            });
+
+            p.dropdown.addEventListener('mousedown', (e) => {
+                // 用 mousedown 而非 click：blur 会先触发并关掉列表
+                const option = e.target.closest('.model-option[data-id]');
+                if (option) { e.preventDefault(); selectModel(p, option.dataset.id); }
+            });
+
+            picker.querySelector('.model-refresh').addEventListener('click', () => {
+                delete modelCache[p.field];
+                requestModels(p.provider, p.field);
+                p.search.focus();
+            });
+
+            p.search.addEventListener('blur', () => {
+                // 延迟关闭，让 mousedown 选中先生效
+                setTimeout(() => closeDropdown(p), 150);
+            });
         });
         
         // API提供商切换
@@ -1356,33 +1673,20 @@ export class SettingsPanel {
                     }
                 });
             }
-            if (settings.openrouterModel !== undefined) {
-                const el = document.getElementById('openrouterModel');
-                if (el) el.value = settings.openrouterModel;
-            }
-            if (settings.openrouterSiteUrl !== undefined) {
-                const el = document.getElementById('openrouterSiteUrl');
-                if (el) el.value = settings.openrouterSiteUrl;
-            }
-            if (settings.openrouterSiteTitle !== undefined) {
-                const el = document.getElementById('openrouterSiteTitle');
-                if (el) el.value = settings.openrouterSiteTitle;
-            }
+            // 模型字段走选择器，需要同步隐藏值与搜索框显示值
+            ['openaiModel', 'geminiModel', 'deepseekModel', 'openrouterModel',
+             'customOpenAIModel', 'customAnthropicModel'].forEach((field) => {
+                if (settings[field] !== undefined) {
+                    setPickerValue(field, settings[field]);
+                }
+            });
             if (settings.customOpenAIBaseUrl !== undefined) {
                 const el = document.getElementById('customOpenAIBaseUrl');
                 if (el) el.value = settings.customOpenAIBaseUrl;
             }
-            if (settings.customOpenAIModel !== undefined) {
-                const el = document.getElementById('customOpenAIModel');
-                if (el) el.value = settings.customOpenAIModel;
-            }
             if (settings.customAnthropicBaseUrl !== undefined) {
                 const el = document.getElementById('customAnthropicBaseUrl');
                 if (el) el.value = settings.customAnthropicBaseUrl;
-            }
-            if (settings.customAnthropicModel !== undefined) {
-                const el = document.getElementById('customAnthropicModel');
-                if (el) el.value = settings.customAnthropicModel;
             }
             if (settings.customAnthropicVersion !== undefined) {
                 const el = document.getElementById('customAnthropicVersion');
@@ -1449,9 +1753,10 @@ export class SettingsPanel {
                 },
                 // 扩展的提供商参数
                 microsoftRegion: document.getElementById('microsoftRegion')?.value || '',
+                openaiModel: document.getElementById('openaiModel')?.value || '',
+                geminiModel: document.getElementById('geminiModel')?.value || '',
+                deepseekModel: document.getElementById('deepseekModel')?.value || '',
                 openrouterModel: document.getElementById('openrouterModel')?.value || '',
-                openrouterSiteUrl: document.getElementById('openrouterSiteUrl')?.value || '',
-                openrouterSiteTitle: document.getElementById('openrouterSiteTitle')?.value || '',
                 customOpenAIBaseUrl: document.getElementById('customOpenAIBaseUrl')?.value || '',
                 customOpenAIModel: document.getElementById('customOpenAIModel')?.value || '',
                 customAnthropicBaseUrl: document.getElementById('customAnthropicBaseUrl')?.value || '',
@@ -1480,11 +1785,12 @@ export class SettingsPanel {
             }
             
             let extras = {};
-            if (provider === 'openrouter') {
+            if (provider === 'openai' || provider === 'gemini' || provider === 'deepseek') {
+                // 带上表单里当前选中的模型，测试结果才与实际翻译一致
+                extras[provider + 'Model'] = document.getElementById(provider + 'Model')?.value || '';
+            } else if (provider === 'openrouter') {
                 extras = {
-                    openrouterModel: document.getElementById('openrouterModel')?.value || '',
-                    openrouterSiteUrl: document.getElementById('openrouterSiteUrl')?.value || '',
-                    openrouterSiteTitle: document.getElementById('openrouterSiteTitle')?.value || ''
+                    openrouterModel: document.getElementById('openrouterModel')?.value || ''
                 };
             } else if (provider === 'customOpenAI') {
                 extras = {

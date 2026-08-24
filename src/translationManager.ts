@@ -10,6 +10,7 @@ import {
     OpenAICompatibleTranslator,
     AnthropicCompatibleTranslator,
 } from './translator';
+import { SecretStore } from './secretStore';
 import axios from 'axios';
 
 export interface TranslationProvider {
@@ -97,17 +98,13 @@ export class TranslationManager {
         this.providers.set('google', this.currentProvider);
     }
 
-    public updateProvider(providerName: string, config: vscode.WorkspaceConfiguration) {
-        const apiKey = config.get<string>(`${providerName}ApiKey`, '')
-            || (providerName === 'openai' ? config.get<string>('openaiApiKey', '') : '')
-            || (providerName === 'gemini' ? config.get<string>('geminiApiKey', '') : '')
-            || (providerName === 'deepseek' ? config.get<string>('deepseekApiKey', '') : '')
-            || (providerName === 'openrouter' ? config.get<string>('openrouterApiKey', '') : '')
-            || (providerName === 'customOpenAI' ? config.get<string>('customOpenAIApiKey', '') : '')
-            || (providerName === 'customAnthropic' ? config.get<string>('customAnthropicApiKey', '') : '');
-        
+    /**
+     * 切换/刷新当前提供商。
+     * apiKey 由调用方从 SecretStorage 取出后传入，配置里不再有明文 Key。
+     */
+    public updateProvider(providerName: string, config: vscode.WorkspaceConfiguration, apiKey: string = '') {
         let provider: TranslationProvider;
-        
+
         switch (providerName) {
             case 'google':
                 provider = new GoogleTranslator(apiKey);
@@ -122,45 +119,46 @@ export class TranslationManager {
                 );
                 break;
             case 'openai':
-                provider = new OpenAITranslator(apiKey);
+                provider = new OpenAITranslator(apiKey, config.get<string>('openaiModel', ''));
                 break;
             case 'gemini':
-                provider = new GeminiTranslator(apiKey);
+                provider = new GeminiTranslator(apiKey, config.get<string>('geminiModel', ''));
                 break;
             case 'deepseek':
-                provider = new DeepSeekTranslator(apiKey);
+                provider = new DeepSeekTranslator(apiKey, config.get<string>('deepseekModel', ''));
                 break;
             case 'openrouter':
-                provider = new OpenRouterTranslator(
-                    apiKey,
-                    config.get<string>('openrouterModel', 'openai/gpt-4o-mini'),
-                    config.get<string>('openrouterSiteUrl', ''),
-                    config.get<string>('openrouterSiteTitle', 'Translater2077')
-                );
+                provider = new OpenRouterTranslator(apiKey, config.get<string>('openrouterModel', ''));
                 break;
             case 'customOpenAI':
                 provider = new OpenAICompatibleTranslator(
                     apiKey,
                     config.get<string>('customOpenAIBaseUrl', 'https://api.openai.com/v1'),
-                    config.get<string>('customOpenAIModel', 'gpt-4o-mini')
+                    config.get<string>('customOpenAIModel', '')
                 );
                 break;
             case 'customAnthropic':
                 provider = new AnthropicCompatibleTranslator(
                     apiKey,
                     config.get<string>('customAnthropicBaseUrl', 'https://api.anthropic.com/v1/messages'),
-                    config.get<string>('customAnthropicModel', 'claude-3-5-haiku-20241022'),
+                    config.get<string>('customAnthropicModel', ''),
                     config.get<string>('customAnthropicVersion', '2023-06-01')
                 );
                 break;
             default:
                 provider = new GoogleTranslator(apiKey);
         }
-        
+
         this.providers.set(providerName, provider);
         this.currentProvider = provider;
         this.currentProviderName = providerName;
         this.currentProviderHasKey = !!apiKey;
+    }
+
+    /** 从 SecretStorage 取 Key 后刷新提供商，扩展内切换配置时的常规入口 */
+    public async refreshProvider(providerName: string, config: vscode.WorkspaceConfiguration): Promise<void> {
+        const apiKey = await SecretStore.get().getKey(providerName);
+        this.updateProvider(providerName, config, apiKey);
     }
 
     public async translate(text: string, targetLang: string = 'zh-CN', sourceLang: string = 'auto'): Promise<{translation: string, provider: string}> {

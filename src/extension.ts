@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { WordHelper } from './wordHelper';
 import { SettingsPanel } from './settingsPanel';
 import { TranslationManager } from './translationManager';
+import { SecretStore } from './secretStore';
 
 // m
 type UiStrings = {
@@ -270,14 +271,25 @@ export function activate(context: vscode.ExtensionContext) {
     // 初始时显示设置按钮（尚无翻译结果）
     settingsButton.show();
 
+    // 初始化密钥存储，并把旧版本残留在 settings.json 里的明文 Key 迁进钥匙串
+    const secretStore = SecretStore.init(context);
+
     // 初始化翻译管理器
     const config = vscode.workspace.getConfiguration('codeTranslator');
     translationManager = new TranslationManager();
     // 已移除输出面板历史记录功能
-    
-    // 更新翻译提供商
+
     const provider = config.get<string>('apiProvider', 'google');
-    translationManager.updateProvider(provider, config);
+    void (async () => {
+        const migrated = await secretStore.migrateFromSettings();
+        if (migrated > 0 && await secretStore.shouldAnnounceMigration()) {
+            vscode.window.showInformationMessage(
+                `Translator2077：已将 ${migrated} 个 API Key 移入系统密钥存储，并从 settings.json 中清除。`
+            );
+        }
+        await translationManager.refreshProvider(provider, config);
+    })();
+
     // 根据目标语言更新右键菜单上下文
     updateTargetLangContext();
 
@@ -337,6 +349,16 @@ export function activate(context: vscode.ExtensionContext) {
     const settingsCommand = vscode.commands.registerCommand('codeTranslator.openSettings', () => {
         SettingsPanel.createOrShow(context.extensionUri);
     });
+
+    // 内部命令：设置面板保存后调用。API Key 存在 SecretStorage 里，
+    // 单独改 Key 不会触发配置变更事件，必须由此显式重建提供商。
+    const reloadProviderCommand = vscode.commands.registerCommand(
+        'codeTranslator.internal.reloadProvider',
+        async () => {
+            const latest = vscode.workspace.getConfiguration('codeTranslator');
+            await translationManager.refreshProvider(latest.get<string>('apiProvider', 'google'), latest);
+        }
+    );
 
     // 点击状态栏显示详情弹窗（默认命令，会被displayTranslation中根据设置覆盖）
     statusBarItem.command = 'codeTranslator.showDetails';
@@ -779,14 +801,14 @@ export function activate(context: vscode.ExtensionContext) {
             console.log('Configuration changed, updating translation provider and context');
             const updatedConfig = vscode.workspace.getConfiguration('codeTranslator');
             const provider = updatedConfig.get<string>('apiProvider', 'google');
-            translationManager.updateProvider(provider, updatedConfig);
+            void translationManager.refreshProvider(provider, updatedConfig);
             updateTargetLangContext();
             // 刷新状态栏tooltip语言
             statusBarItem.tooltip = getUiStrings().tooltipClickToClear;
         }
     });
     
-    context.subscriptions.push(translateCommand, ...translateLangCommands, clearCommand, settingsCommand, selectionChangeListener, showDetailsCommand, configChangeListener);
+    context.subscriptions.push(translateCommand, ...translateLangCommands, clearCommand, settingsCommand, reloadProviderCommand, selectionChangeListener, showDetailsCommand, configChangeListener);
 }
 
 function updateTargetLangContext() {
