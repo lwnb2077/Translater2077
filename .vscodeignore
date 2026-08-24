@@ -16,3 +16,6 @@ vsc-extension-quickstart.md
 .github/**
 .claude/**
 .cursor/**
+# AI agent 开发文档，不应随扩展分发
+AGENTS.md
+CLAUDE.md
