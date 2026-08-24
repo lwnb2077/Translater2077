@@ -384,58 +384,67 @@ export class SettingsPanel {
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} https:; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
     <title>Translater2077设置</title>
     <style>
-        /* 语言切换按钮样式 */
-        .language-switcher {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--vscode-editor-background);
-            border: 1px solid var(--vscode-widget-border);
-            border-radius: 8px;
-            padding: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        /* ===== 吸顶工具栏：标题 + 界面语言 + 保存 ===== */
+        .topbar {
+            position: sticky;
+            top: 0;
             z-index: 1000;
+            /* 抵消 body 内边距，让工具栏横贯整个面板宽度 */
+            margin: -20px -20px 20px;
+            background: var(--vscode-editor-background);
+            border-bottom: 1px solid var(--vscode-widget-border);
         }
 
-        .language-toggle {
+        .topbar-inner {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .topbar-title {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            padding: 0;
+            white-space: nowrap;
+        }
+
+        .topbar-actions {
             display: flex;
             align-items: center;
             gap: 8px;
-            background: transparent;
-            border: none;
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 4px;
-            transition: background-color 0.2s;
         }
 
-        .language-toggle:hover {
-            background: var(--vscode-button-hoverBackground);
-        }
-
-        .language-icon {
-            font-size: 16px;
-            color: var(--vscode-textLink-foreground);
-        }
-
-        .language-text {
+        /* 界面语言下拉：紧凑尺寸，覆盖全局 select 的 100% 宽度 */
+        .lang-select {
+            width: auto !important;
+            min-width: 96px;
+            height: 28px;
+            padding: 2px 8px;
             font-size: 12px;
-            color: var(--vscode-foreground);
-            font-weight: 500;
+            background: var(--vscode-dropdown-background);
+            color: var(--vscode-dropdown-foreground);
+            border: 1px solid var(--vscode-dropdown-border, var(--vscode-widget-border));
+            border-radius: 4px;
+            cursor: pointer;
         }
 
-        /* 统一顶部两个悬浮按钮的尺寸与布局 */
-        .language-toggle,
-        .language-actions .save-button {
+        .topbar .save-button {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 120px;
-            height: 36px;
-            padding: 0 12px;
-            border-radius: 6px;
+            height: 28px;
+            padding: 0 16px;
             font-size: 12px;
+            border-radius: 4px;
             box-sizing: border-box;
+            white-space: nowrap;
         }
         body {
             font-family: var(--vscode-font-family);
@@ -674,19 +683,22 @@ export class SettingsPanel {
     </style>
 </head>
 <body>
-    <!-- 语言切换器 + 顶部操作 -->
-    <div class="language-switcher">
-        <button class="language-toggle" id="languageToggle">
-            <span class="language-text" id="languageText">中文</span>
-        </button>
-        <div class="language-actions">
-            <button type="button" class="save-button" id="saveBtn" data-i18n="saveSettings">保存设置</button>
+    <!-- 吸顶工具栏：标题在左，界面语言与保存在右，滚动时保持可见 -->
+    <header class="topbar">
+        <div class="topbar-inner">
+            <h1 class="topbar-title"><span data-i18n="title">🌐 Translator2077 设置</span></h1>
+            <div class="topbar-actions">
+                <select id="uiLanguage" class="lang-select" title="界面语言 / UI Language">
+                    <option value="zh">中文</option>
+                    <option value="en">English</option>
+                    <option value="ja">日本語</option>
+                </select>
+                <button type="button" class="save-button" id="saveBtn" data-i18n="saveSettings">保存设置</button>
+            </div>
         </div>
-    </div>
+    </header>
 
     <div class="container">
-        <h1 data-i18n="title">Translater2077设置</h1>
-        
         <div id="messages"></div>
         
         <!-- API设置 -->
@@ -980,7 +992,7 @@ export class SettingsPanel {
         // 多语言资源
         const i18nResources = {
             zh: {
-                title: "🌐 Translater2077设置",
+                title: "🌐 Translator2077 设置",
                 apiSettings: "🔑 翻译API设置",
                 providerLabel: "翻译服务提供商：",
                 "provider.google": "Google Translate",
@@ -1083,7 +1095,7 @@ export class SettingsPanel {
                 geminiNotes: "需要在 Google AI Studio 申请 API Key；部分地区不可用或需代理，计费与配额以官方为准。"
             },
             en: {
-                title: "🌐 Translater2077 Settings",
+                title: "🌐 Translator2077 Settings",
                 apiSettings: "🔑 Translation API Settings",
                 providerLabel: "Translation Service Provider:",
                 "provider.google": "Google Translate",
@@ -1186,7 +1198,7 @@ export class SettingsPanel {
                 geminiNotes: "Requires API key from Google AI Studio; some regions may be unavailable or require proxy, with fees and quotas subject to official documentation."
             },
             ja: {
-                title: "🌐 Translater2077 設定",
+                title: "🌐 Translator2077 設定",
                 apiSettings: "🔑 翻訳API設定",
                 providerLabel: "翻訳サービスプロバイダー：",
                 "provider.google": "Google翻訳",
@@ -1298,26 +1310,28 @@ export class SettingsPanel {
             }
         };
         
-        // 当前语言
-        let currentLanguage = 'zh';
+        // 当前界面语言：优先恢复上次的选择（webview state 随面板持久化）
         const supportedLanguages = ['zh', 'en', 'ja'];
-        const languageNames = {
-            zh: '中文',
-            en: 'English', 
-            ja: '日本語'
-        };
-        
-        // 语言切换功能
-        function toggleLanguage() {
-            const currentIndex = supportedLanguages.indexOf(currentLanguage);
-            const nextIndex = (currentIndex + 1) % supportedLanguages.length;
-            currentLanguage = supportedLanguages[nextIndex];
+        const savedState = vscode.getState() || {};
+        let currentLanguage = supportedLanguages.includes(savedState.uiLang) ? savedState.uiLang : 'zh';
+        let userPickedLanguage = !!savedState.uiLang; // 用户显式选过语言后，不再跟随目标语言自动推断
+
+        function setUiLanguage(lang, explicit) {
+            if (!supportedLanguages.includes(lang) || lang === currentLanguage && !explicit) {
+                if (!supportedLanguages.includes(lang)) { return; }
+            }
+            currentLanguage = lang;
+            if (explicit) {
+                userPickedLanguage = true;
+                vscode.setState(Object.assign({}, vscode.getState() || {}, { uiLang: lang }));
+            }
             updateLanguageDisplay();
             updatePageLanguage();
         }
-        
+
         function updateLanguageDisplay() {
-            document.getElementById('languageText').textContent = languageNames[currentLanguage];
+            const sel = document.getElementById('uiLanguage');
+            if (sel) { sel.value = currentLanguage; }
         }
         
         function updatePageLanguage() {
@@ -1736,6 +1750,13 @@ export class SettingsPanel {
                 if (el) el.value = settings.customAnthropicVersion;
             }
             
+            // 用户未显式选过界面语言时，跟随目标翻译语言推断一次
+            if (!userPickedLanguage && settings.targetLanguage) {
+                const tl = String(settings.targetLanguage).toLowerCase();
+                const derived = tl.startsWith('zh') ? 'zh' : (tl === 'ja' ? 'ja' : 'en');
+                if (derived !== currentLanguage) { setUiLanguage(derived, false); }
+            }
+
             // 触发提供商切换事件
             document.getElementById('apiProvider').dispatchEvent(new Event('change'));
             
@@ -1882,11 +1903,20 @@ export class SettingsPanel {
             if (saveBtn) {
                 saveBtn.addEventListener('click', () => saveSettings());
             }
-            // 绑定语言切换
-            const langToggle = document.getElementById('languageToggle');
-            if (langToggle) {
-                langToggle.addEventListener('click', () => toggleLanguage());
+            // Ctrl+S / Cmd+S 快捷保存
+            document.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                    e.preventDefault();
+                    saveSettings();
+                }
+            });
+            // 绑定界面语言下拉
+            const uiLangSel = document.getElementById('uiLanguage');
+            if (uiLangSel) {
+                uiLangSel.addEventListener('change', () => setUiLanguage(uiLangSel.value, true));
             }
+            // 恢复上次的界面语言
+            updatePageLanguage();
             // 绑定测试连接按钮
             document.querySelectorAll('.test-btn').forEach((btn) => {
                 const provider = btn.getAttribute('data-provider');
