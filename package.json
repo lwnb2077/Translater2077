@@ -2,7 +2,7 @@
   "name": "Translator2077",
   "displayName": "Translator2077",
   "description": "Translator2077：一键翻译代码和单词，支持划词翻译、点击翻译，多种翻译服务可选",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "license": "MIT",
   "publisher": "SILENTCORELTD",
   "icon": "icon.png",
@@ -169,6 +169,13 @@
             "gemini",
             "deepseek",
             "openrouter",
+            "xai",
+            "zhipu",
+            "qwen",
+            "moonshot",
+            "groq",
+            "mistral",
+            "siliconflow",
             "customOpenAI",
             "customAnthropic"
           ],
@@ -180,6 +187,13 @@
             "Google Gemini - 模型从官方接口实时获取并选择（需要 API Key）",
             "DeepSeek - 模型从官方接口实时获取并选择（需要 API Key）",
             "OpenRouter - 统一 OpenAI 兼容网关，模型目录公开可选（需要 API Key）",
+            "xAI (Grok) - OpenAI 兼容接口，模型实时获取自选（需要 API Key）",
+            "Z.AI (智谱 GLM) - OpenAI 兼容接口，模型实时获取自选（需要 API Key）",
+            "通义千问 Qwen - OpenAI 兼容接口，模型实时获取自选（需要 API Key）",
+            "Moonshot (Kimi) - OpenAI 兼容接口，模型实时获取自选（需要 API Key）",
+            "Groq - OpenAI 兼容接口，模型实时获取自选（需要 API Key）",
+            "Mistral - OpenAI 兼容接口，模型实时获取自选（需要 API Key）",
+            "硅基流动 SiliconFlow - OpenAI 兼容接口，模型实时获取自选（需要 API Key）",
             "自定义 OpenAI 兼容 - 任意 Chat Completions 基址 + 模型 + Key",
             "自定义 Anthropic 兼容 - 任意 Messages API 端点 + 模型 + Key"
           ],
@@ -306,6 +320,41 @@
           "type": "string",
           "default": "",
           "description": "OpenRouter 模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
+        },
+        "codeTranslator.xaiModel": {
+          "type": "string",
+          "default": "",
+          "description": "xAI (Grok) 模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
+        },
+        "codeTranslator.zhipuModel": {
+          "type": "string",
+          "default": "",
+          "description": "Z.AI (智谱 GLM) 模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
+        },
+        "codeTranslator.qwenModel": {
+          "type": "string",
+          "default": "",
+          "description": "通义千问 Qwen 模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
+        },
+        "codeTranslator.moonshotModel": {
+          "type": "string",
+          "default": "",
+          "description": "Moonshot (Kimi) 模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
+        },
+        "codeTranslator.groqModel": {
+          "type": "string",
+          "default": "",
+          "description": "Groq 模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
+        },
+        "codeTranslator.mistralModel": {
+          "type": "string",
+          "default": "",
+          "description": "Mistral 模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
+        },
+        "codeTranslator.siliconflowModel": {
+          "type": "string",
+          "default": "",
+          "description": "硅基流动 SiliconFlow 模型 ID；留空表示未选择，请在设置面板中从实时列表选取"
         },
         "codeTranslator.customOpenAIApiKey": {
           "type": "string",

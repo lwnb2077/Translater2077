@@ -9,6 +9,14 @@ export const KEYED_PROVIDERS = [
     'gemini',
     'deepseek',
     'openrouter',
+    // OpenAI 兼容预设提供商（见 modelCatalog.OPENAI_COMPAT_PRESETS）
+    'xai',
+    'zhipu',
+    'qwen',
+    'moonshot',
+    'groq',
+    'mistral',
+    'siliconflow',
     'customOpenAI',
     'customAnthropic',
 ] as const;

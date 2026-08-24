@@ -10,6 +10,7 @@ import {
     OpenAICompatibleTranslator,
     AnthropicCompatibleTranslator,
 } from './translator';
+import { OPENAI_COMPAT_PRESETS } from './modelCatalog';
 import { SecretStore } from './secretStore';
 import axios from 'axios';
 
@@ -145,8 +146,20 @@ export class TranslationManager {
                     config.get<string>('customAnthropicVersion', '2023-06-01')
                 );
                 break;
-            default:
-                provider = new GoogleTranslator(apiKey);
+            default: {
+                // OpenAI 兼容预设提供商：查表构造，逻辑与 customOpenAI 完全一致
+                const preset = OPENAI_COMPAT_PRESETS[providerName];
+                if (preset) {
+                    provider = new OpenAICompatibleTranslator(
+                        apiKey,
+                        preset.baseUrl,
+                        config.get<string>(`${providerName}Model`, ''),
+                        providerName
+                    );
+                } else {
+                    provider = new GoogleTranslator(apiKey);
+                }
+            }
         }
 
         this.providers.set(providerName, provider);

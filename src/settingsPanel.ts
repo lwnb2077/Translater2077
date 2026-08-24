@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { SecretStore } from './secretStore';
-import { listModels } from './modelCatalog';
+import { listModels, OPENAI_COMPAT_PRESETS } from './modelCatalog';
 
 export class SettingsPanel {
     public static currentPanel: SettingsPanel | undefined;
@@ -117,7 +117,11 @@ export class SettingsPanel {
             if (typeof settings.microsoftRegion === 'string') {
                 await config.update('microsoftRegion', settings.microsoftRegion, vscode.ConfigurationTarget.Global);
             }
-            for (const field of ['openaiModel', 'geminiModel', 'deepseekModel', 'openrouterModel'] as const) {
+            const modelFields = [
+                'openaiModel', 'geminiModel', 'deepseekModel', 'openrouterModel',
+                ...Object.keys(OPENAI_COMPAT_PRESETS).map((p) => `${p}Model`),
+            ];
+            for (const field of modelFields) {
                 if (typeof settings[field] === 'string') {
                     await config.update(field, settings[field], vscode.ConfigurationTarget.Global);
                 }
@@ -187,6 +191,9 @@ export class SettingsPanel {
             geminiModel: config.get('geminiModel', ''),
             deepseekModel: config.get('deepseekModel', ''),
             openrouterModel: config.get('openrouterModel', ''),
+            ...Object.fromEntries(Object.keys(OPENAI_COMPAT_PRESETS).map(
+                (p) => [`${p}Model`, config.get(`${p}Model`, '')]
+            )),
             customOpenAIBaseUrl: config.get('customOpenAIBaseUrl', 'https://api.openai.com/v1'),
             customOpenAIModel: config.get('customOpenAIModel', ''),
             customAnthropicBaseUrl: config.get('customAnthropicBaseUrl', 'https://api.anthropic.com/v1/messages'),
@@ -213,6 +220,7 @@ export class SettingsPanel {
                 'geminiModel',
                 'deepseekModel',
                 'openrouterModel',
+                ...Object.keys(OPENAI_COMPAT_PRESETS).map((p) => `${p}Model`),
                 'customOpenAIBaseUrl',
                 'customOpenAIModel',
                 'customAnthropicBaseUrl',
@@ -245,7 +253,8 @@ export class SettingsPanel {
                 }
             } as unknown as vscode.WorkspaceConfiguration;
 
-            tm.updateProvider(provider, tempConfig);
+            // 第三参必须传表单里的 Key：updateProvider 已不再从配置读取密钥
+            tm.updateProvider(provider, tempConfig, apiKey || '');
 
             // 对必须密钥的提供商进行空值拦截
             const providersRequireKey = new Set([
@@ -254,6 +263,7 @@ export class SettingsPanel {
                 'gemini',
                 'microsoft',
                 'openrouter',
+                ...Object.keys(OPENAI_COMPAT_PRESETS),
                 'customOpenAI',
                 'customAnthropic',
             ]);
@@ -345,6 +355,22 @@ export class SettingsPanel {
                     <div class="model-dropdown hidden"></div>
                     <p class="model-status"></p>
                 </div>`;
+    }
+
+    /** OpenAI 兼容预设提供商的配置区块：Key 输入 + 测试 + 模型选择器 */
+    private _renderPresetSection(id: string, preset: { label: string; keysUrl: string }): string {
+        return `
+            <div class="form-group api-key-section hidden" id="${id}Section">
+                <label for="${id}ApiKey">${preset.label} API Key：</label>
+                <div class="api-key-group">
+                    <input type="password" id="${id}ApiKey" autocomplete="off">
+                    <button type="button" class="secondary test-btn" data-provider="${id}" data-i18n="testConnection">测试连接</button>
+                </div>
+                ${this._renderModelPicker(id, `${id}Model`)}
+                <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;">
+                    OpenAI 兼容接口 · <a href="${preset.keysUrl}">${preset.keysUrl.replace('https://', '')}</a> 申请 Key
+                </p>
+            </div>`;
     }
 
     private _getHtmlForWebview() {
@@ -673,10 +699,12 @@ export class SettingsPanel {
                     <option value="google" data-i18n="provider.google">Google Translate</option>
                     <option value="deepl" data-i18n="provider.deepl">DeepL</option>
                     <option value="microsoft" data-i18n="provider.microsoft">微软翻译</option>
-                    <option value="openai" data-i18n="provider.openai">OpenAI (GPT‑4o mini)</option>
-                    <option value="gemini" data-i18n="provider.gemini">Google Gemini (2.5 Flash)</option>
-                    <option value="deepseek" data-i18n="provider.deepseek">DeepSeek v3.1</option>
+                    <option value="openai" data-i18n="provider.openai">OpenAI</option>
+                    <option value="gemini" data-i18n="provider.gemini">Google Gemini</option>
+                    <option value="deepseek" data-i18n="provider.deepseek">DeepSeek</option>
                     <option value="openrouter" data-i18n="provider.openrouter">OpenRouter</option>
+                    ${Object.entries(OPENAI_COMPAT_PRESETS).map(([id, p]) =>
+                        `<option value="${id}">${p.label}</option>`).join('\n                    ')}
                     <option value="customOpenAI" data-i18n="provider.customOpenAI">自定义 OpenAI 兼容</option>
                     <option value="customAnthropic" data-i18n="provider.customAnthropic">自定义 Anthropic 兼容</option>
                 </select>
@@ -755,6 +783,9 @@ export class SettingsPanel {
                 <p style="color: var(--vscode-descriptionForeground); font-size: 12px; margin-top: 8px;" data-i18n="openrouterNotes">OpenAI 兼容 Chat Completions；鉴权 Bearer。模型目录公开，无需 Key 即可浏览。</p>
             </div>
             
+            <!-- OpenAI 兼容预设提供商（xAI / 智谱 / Qwen / Kimi / Groq / Mistral / SiliconFlow）-->
+            ${Object.entries(OPENAI_COMPAT_PRESETS).map(([id, p]) => this._renderPresetSection(id, p)).join('\n')}
+
             <!-- 自定义 OpenAI 兼容 -->
             <div class="form-group api-key-section hidden" id="customOpenAISection">
                 <label for="customOpenAIApiKey" data-i18n="customOpenAIApiKeyLabel">API Key（Bearer）：</label>
@@ -943,6 +974,8 @@ export class SettingsPanel {
     
     <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
+        // OpenAI 兼容预设提供商 ID 列表，由扩展端注入
+        const PRESET_PROVIDERS = ${JSON.stringify(Object.keys(OPENAI_COMPAT_PRESETS))};
         
         // 多语言资源
         const i18nResources = {
@@ -953,9 +986,9 @@ export class SettingsPanel {
                 "provider.google": "Google Translate",
                 "provider.deepl": "DeepL",
                 "provider.microsoft": "微软翻译",
-                "provider.openai": "OpenAI (GPT‑4o mini)",
-                "provider.gemini": "Google Gemini (2.5 Flash)",
-                "provider.deepseek": "DeepSeek v3.1",
+                "provider.openai": "OpenAI",
+                "provider.gemini": "Google Gemini",
+                "provider.deepseek": "DeepSeek",
                 "provider.openrouter": "OpenRouter",
                 "provider.customOpenAI": "自定义 OpenAI 兼容",
                 "provider.customAnthropic": "自定义 Anthropic 兼容",
@@ -976,6 +1009,7 @@ export class SettingsPanel {
                 modelNoMatch: "没有匹配的模型",
                 modelSelected: "已选择：",
                 modelFetchFailed: "获取模型列表失败",
+                presetProviderInfo: "OpenAI 兼容接口；模型列表从官方实时获取并自选；需要 API Key。",
                 customAnthropicNotes: "Anthropic Messages API；第三方网关请按其文档填写 URL 与版本头。",
                 googleApiKey: "Google Translate API Key：",
                 googleApiKeyPlaceholder: "输入您的Google API密钥（可选，不填使用免费服务）",
@@ -983,17 +1017,17 @@ export class SettingsPanel {
                 microsoftApiKeyPlaceholder: "输入您的微软翻译API密钥",
                 testConnection: "测试连接",
                 openaiApiKey: "OpenAI API Key：",
-                openaiApiKeyPlaceholder: "输入 OpenAI API Key（用于 GPT‑4o mini）",
+                openaiApiKeyPlaceholder: "输入 OpenAI API Key",
                 deeplApiKey: "DeepL API Key：",
                 deeplApiKeyPlaceholder: "输入DeepL API Key（免费版以':fx'结尾）",
                 geminiApiKey: "Google AI Studio API Key：",
-                geminiApiKeyPlaceholder: "输入 Google AI Studio API Key（用于 Gemini 2.5 Flash）",
+                geminiApiKeyPlaceholder: "输入 Google AI Studio API Key",
                 deepseekApiKey: "DeepSeek API Key：",
                 deepseekApiKeyPlaceholder: "输入DeepSeek API Key",
                 deeplNotes: "支持免费版（API Key以':fx'结尾）和专业版，高质量翻译服务。",
                 openaiNotes: "需要有效的 OpenAI 账号与 API Key，计费按使用量收取；部分地区可能无法直连，需配置代理。",
                 geminiNotes: "需要在 Google AI Studio 申请 API Key；部分地区不可用或需代理，计费与配额以官方为准。",
-                deepseekNotes: "强大的语言模型翻译服务，使用deepseek-chat模型，需要API Key。",
+                deepseekNotes: "强大的语言模型翻译服务，模型列表从 DeepSeek 接口实时获取。",
                 languageSettings: "🌍 语言设置",
                 sourceLanguageLabel: "源语言（自动检测推荐）：",
                 targetLanguageLabel: "目标语言：",
@@ -1055,9 +1089,9 @@ export class SettingsPanel {
                 "provider.google": "Google Translate",
                 "provider.deepl": "DeepL",
                 "provider.microsoft": "Microsoft Translator",
-                "provider.openai": "OpenAI (GPT‑4o mini)",
-                "provider.gemini": "Google Gemini (2.5 Flash)",
-                "provider.deepseek": "DeepSeek v3.1",
+                "provider.openai": "OpenAI",
+                "provider.gemini": "Google Gemini",
+                "provider.deepseek": "DeepSeek",
                 "provider.openrouter": "OpenRouter",
                 "provider.customOpenAI": "Custom OpenAI-compatible",
                 "provider.customAnthropic": "Custom Anthropic-compatible",
@@ -1078,6 +1112,7 @@ export class SettingsPanel {
                 modelNoMatch: "No matching model",
                 modelSelected: "Selected: ",
                 modelFetchFailed: "Failed to fetch model list",
+                presetProviderInfo: "OpenAI-compatible API; the model list is fetched live and picked by you; API key required.",
                 customAnthropicNotes: "Anthropic Messages API; for third-party proxies follow their URL and version header docs.",
                 googleApiKey: "Google Translate API Key:",
                 googleApiKeyPlaceholder: "Enter your Google API key (optional, uses free service if empty)",
@@ -1085,17 +1120,17 @@ export class SettingsPanel {
                 microsoftApiKeyPlaceholder: "Enter your Microsoft Translator API key",
                 testConnection: "Test Connection",
                 openaiApiKey: "OpenAI API Key:",
-                openaiApiKeyPlaceholder: "Enter OpenAI API Key (for GPT‑4o mini)",
+                openaiApiKeyPlaceholder: "Enter OpenAI API Key",
                 deeplApiKey: "DeepL API Key:",
                 deeplApiKeyPlaceholder: "Enter DeepL API Key (free version ends with ':fx')",
                 geminiApiKey: "Google AI Studio API Key:",
-                geminiApiKeyPlaceholder: "Enter Google AI Studio API Key (for Gemini 2.5 Flash)",
+                geminiApiKeyPlaceholder: "Enter Google AI Studio API Key",
                 deepseekApiKey: "DeepSeek API Key:",
                 deepseekApiKeyPlaceholder: "Enter DeepSeek API Key",
                 deeplNotes: "Supports both free version (API key ends with ':fx') and professional version, high-quality translation service.",
                 openaiNotes: "OpenAI account and API key required; usage-based billing; proxy may be required in some regions.",
                 geminiNotes: "API key from Google AI Studio required; availability and quotas vary by region; proxy may be needed.",
-                deepseekNotes: "Powerful language model translation service using deepseek-chat model, API key required.",
+                deepseekNotes: "Powerful language model translation; the model list is fetched live from the DeepSeek API.",
                 languageSettings: "🌍 Language Settings",
                 sourceLanguageLabel: "Source Language (Auto-detect recommended):",
                 targetLanguageLabel: "Target Language:",
@@ -1157,9 +1192,9 @@ export class SettingsPanel {
                 "provider.google": "Google翻訳",
                 "provider.deepl": "DeepL",
                 "provider.microsoft": "Microsoft翻訳",
-                "provider.openai": "OpenAI (GPT‑4o mini)",
-                "provider.gemini": "Google Gemini (2.5 Flash)",
-                "provider.deepseek": "DeepSeek v3.1",
+                "provider.openai": "OpenAI",
+                "provider.gemini": "Google Gemini",
+                "provider.deepseek": "DeepSeek",
                 "provider.openrouter": "OpenRouter",
                 "provider.customOpenAI": "カスタム OpenAI 互換",
                 "provider.customAnthropic": "カスタム Anthropic 互換",
@@ -1180,6 +1215,7 @@ export class SettingsPanel {
                 modelNoMatch: "一致するモデルがありません",
                 modelSelected: "選択済み：",
                 modelFetchFailed: "モデル一覧の取得に失敗しました",
+                presetProviderInfo: "OpenAI 互換 API。モデル一覧はリアルタイム取得して選択。APIキー必要。",
                 customAnthropicNotes: "Anthropic Messages API。サードパーティは各ドキュメントに従ってください。",
                 googleApiKey: "Google翻訳APIキー：",
                 googleApiKeyPlaceholder: "GoogleのAPIキーを入力（オプション、空の場合無料サービスを使用）",
@@ -1189,15 +1225,15 @@ export class SettingsPanel {
                 deeplApiKey: "DeepL APIキー：",
                 deeplApiKeyPlaceholder: "DeepL APIキーを入力（無料版は':fx'で終了）",
                 openaiApiKey: "OpenAI APIキー：",
-                openaiApiKeyPlaceholder: "OpenAIのAPIキーを入力（GPT‑4o mini 用）",
+                openaiApiKeyPlaceholder: "OpenAIのAPIキーを入力",
                 geminiApiKey: "Google AI Studio APIキー：",
-                geminiApiKeyPlaceholder: "Google AI Studio の APIキーを入力（Gemini 2.5 Flash 用）",
+                geminiApiKeyPlaceholder: "Google AI Studio の APIキーを入力",
                 deepseekApiKey: "DeepSeek APIキー：",
                 deepseekApiKeyPlaceholder: "DeepSeek APIキーを入力",
                 deeplNotes: "無料版（APIキーが':fx'で終わる）とプロ版をサポート、高品質翻訳サービス。",
                 openaiNotes: "OpenAIのアカウントとAPIキーが必要です。従量課金。地域によりプロキシが必要な場合があります。",
                 geminiNotes: "Google AI Studio でAPIキーが必要です。地域により利用不可/プロキシが必要な場合があります。",
-                deepseekNotes: "deepseek-chatモデルを使用した強力な言語モデル翻訳サービス、APIキーが必要。",
+                deepseekNotes: "強力な言語モデル翻訳。モデル一覧は DeepSeek API からリアルタイム取得。",
                 languageSettings: "🌍 言語設定",
                 sourceLanguageLabel: "ソース言語（自動検出推奨）：",
                 targetLanguageLabel: "ターゲット言語：",
@@ -1342,10 +1378,10 @@ export class SettingsPanel {
                 google: "支持100多种语言，免费版有配额限制",
                 deepl: "DeepL高质量翻译，支持免费版和专业版",
                 microsoft: "微软翻译，支持60多种语言，需要Azure订阅",
-                openai: "OpenAI (GPT‑4o mini)，需要有效的 OpenAI 账号与 API Key，计费按使用量收取；部分地区可能无法直连，需配置代理。",
-                gemini: "Google Gemini (2.5 Flash)，需要在 Google AI Studio 申请 API Key；部分地区不可用或需代理，计费与配额以官方为准。",
-                deepseek: "DeepSeek v3.1强大语言模型翻译，使用deepseek-chat模型，需要API Key。",
-                openrouter: "OpenRouter 统一网关，OpenAI 兼容 API；自选模型；可选 Referer/Title。",
+                openai: "OpenAI，需要有效的 OpenAI 账号与 API Key，计费按使用量收取；部分地区可能无法直连，需配置代理。",
+                gemini: "Google Gemini，需要在 Google AI Studio 申请 API Key；部分地区不可用或需代理，计费与配额以官方为准。",
+                deepseek: "DeepSeek 官方接口，模型从官方实时获取并自选；需要 API Key。",
+                openrouter: "OpenRouter 统一网关，OpenAI 兼容 API；模型目录公开，实时拉取自选。",
                 customOpenAI: "任意 OpenAI Chat Completions 兼容 URL + 模型 + Key（自建/Groq/Together 等）。",
                 customAnthropic: "任意 Anthropic Messages 兼容端点 + 模型 + Key（含第三方 Claude 代理）。"
             },
@@ -1353,10 +1389,10 @@ export class SettingsPanel {
                 google: "Supports 100+ languages, free version has quota limits",
                 deepl: "DeepL high-quality translation, supports free and professional versions",
                 microsoft: "Microsoft Translator, supports 60+ languages, requires Azure subscription",
-                openai: "OpenAI (GPT‑4o mini), requires a valid OpenAI account and API key, billed based on usage; some regions may not be directly accessible, requiring proxy configuration.",
-                gemini: "Google Gemini (2.5 Flash), requires API key from Google AI Studio; some regions may be unavailable or require proxy, with fees and quotas subject to official documentation.",
-                deepseek: "DeepSeek v3.1 powerful language model translation using deepseek-chat model, API key required.",
-                openrouter: "OpenRouter unified gateway; OpenAI-compatible API; pick any model; optional Referer/Title.",
+                openai: "OpenAI, requires a valid OpenAI account and API key, billed based on usage; some regions may not be directly accessible, requiring proxy configuration.",
+                gemini: "Google Gemini, requires API key from Google AI Studio; some regions may be unavailable or require proxy, with fees and quotas subject to official documentation.",
+                deepseek: "DeepSeek official API; the model list is fetched live and picked by you. API key required.",
+                openrouter: "OpenRouter unified gateway; OpenAI-compatible API; public model catalog fetched live.",
                 customOpenAI: "Any OpenAI Chat Completions-compatible URL + model + key (Groq, Together, self-hosted, etc.).",
                 customAnthropic: "Any Anthropic Messages-compatible endpoint + model + key (incl. third-party Claude proxies)."
             },
@@ -1364,10 +1400,10 @@ export class SettingsPanel {
                 google: "100以上の言語をサポート、無料版には制限あり",
                 deepl: "DeepL高品質翻訳、無料版とプロ版をサポート",
                 microsoft: "Microsoft翻訳、60以上の言語をサポート、Azureサブスクリプションが必要",
-                openai: "OpenAI (GPT‑4o mini)，OpenAIのアカウントとAPIキーが必要です。従量課金。地域によりプロキシが必要な場合があります。",
-                gemini: "Google Gemini (2.5 Flash)，Google AI Studio でAPIキーが必要です。地域により利用不可/プロキシが必要な場合があります。",
-                deepseek: "DeepSeek v3.1強力な言語モデル翻訳、deepseek-chatモデルを使用、APIキーが必要。",
-                openrouter: "OpenRouter 統合ゲートウェイ。OpenAI 互換 API。モデル選択可。Referer/Title 任意。",
+                openai: "OpenAI，OpenAIのアカウントとAPIキーが必要です。従量課金。地域によりプロキシが必要な場合があります。",
+                gemini: "Google Gemini，Google AI Studio でAPIキーが必要です。地域により利用不可/プロキシが必要な場合があります。",
+                deepseek: "DeepSeek 公式 API。モデル一覧はリアルタイム取得して選択。APIキー必要。",
+                openrouter: "OpenRouter 統合ゲートウェイ。OpenAI 互換 API。公開モデル一覧をリアルタイム取得。",
                 customOpenAI: "任意の OpenAI Chat Completions 互換 URL + モデル + キー。",
                 customAnthropic: "任意の Anthropic Messages 互換エンドポイント + モデル + キー。"
             }
@@ -1379,6 +1415,12 @@ export class SettingsPanel {
             const providerInfo = providerInfoData[currentLanguage];
             if (providerInfo && providerInfo[provider]) {
                 infoElement.textContent = providerInfo[provider];
+            } else if (PRESET_PROVIDERS.includes(provider)) {
+                // 预设提供商共用一条通用说明
+                infoElement.textContent = t('presetProviderInfo',
+                    'OpenAI 兼容接口；模型列表从官方实时获取并自选；需要 API Key。');
+            } else {
+                infoElement.textContent = '';
             }
         }
         
@@ -1675,7 +1717,8 @@ export class SettingsPanel {
             }
             // 模型字段走选择器，需要同步隐藏值与搜索框显示值
             ['openaiModel', 'geminiModel', 'deepseekModel', 'openrouterModel',
-             'customOpenAIModel', 'customAnthropicModel'].forEach((field) => {
+             'customOpenAIModel', 'customAnthropicModel',
+             ...PRESET_PROVIDERS.map(p => p + 'Model')].forEach((field) => {
                 if (settings[field] !== undefined) {
                     setPickerValue(field, settings[field]);
                 }
@@ -1740,23 +1783,18 @@ export class SettingsPanel {
                 autoHideDelay: getNumberValue('autoHideDelay', 10, 3, 120),
                 detailsDisplayMode: (document.querySelector('input[name="detailsMode"]:checked')?.value) || 'system',
                 detailsPanelWidth: getNumberValue('detailsPanelWidth', 800, 480, 1600),
-                apiKeys: {
-                    google: document.getElementById('googleApiKey').value,
-                    deepl: document.getElementById('deeplApiKey')?.value || '',
-                    microsoft: document.getElementById('microsoftApiKey').value,
-                    openai: document.getElementById('openaiApiKey').value,
-                    gemini: document.getElementById('geminiApiKey').value,
-                    deepseek: document.getElementById('deepseekApiKey').value,
-                    openrouter: document.getElementById('openrouterApiKey')?.value || '',
-                    customOpenAI: document.getElementById('customOpenAIApiKey')?.value || '',
-                    customAnthropic: document.getElementById('customAnthropicApiKey')?.value || ''
-                },
+                apiKeys: Object.fromEntries(
+                    ['google', 'deepl', 'microsoft', 'openai', 'gemini', 'deepseek', 'openrouter',
+                     ...PRESET_PROVIDERS, 'customOpenAI', 'customAnthropic']
+                    .map(p => [p, document.getElementById(p + 'ApiKey')?.value || ''])
+                ),
                 // 扩展的提供商参数
                 microsoftRegion: document.getElementById('microsoftRegion')?.value || '',
                 openaiModel: document.getElementById('openaiModel')?.value || '',
                 geminiModel: document.getElementById('geminiModel')?.value || '',
                 deepseekModel: document.getElementById('deepseekModel')?.value || '',
                 openrouterModel: document.getElementById('openrouterModel')?.value || '',
+                ...Object.fromEntries(PRESET_PROVIDERS.map(p => [p + 'Model', document.getElementById(p + 'Model')?.value || ''])),
                 customOpenAIBaseUrl: document.getElementById('customOpenAIBaseUrl')?.value || '',
                 customOpenAIModel: document.getElementById('customOpenAIModel')?.value || '',
                 customAnthropicBaseUrl: document.getElementById('customAnthropicBaseUrl')?.value || '',

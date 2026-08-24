@@ -223,9 +223,61 @@ async function listCustomAnthropicModels(apiKey: string, baseUrl: string, versio
     }
 }
 
+/**
+ * OpenAI 兼容的预设提供商：一行配置即可接入一家。
+ * 全部走 Chat Completions + /models，翻译与模型拉取逻辑完全复用。
+ */
+export interface OpenAiCompatPreset {
+    /** 下拉框中的显示名 */
+    label: string;
+    /** OpenAI 兼容基址（…/v1 风格） */
+    baseUrl: string;
+    /** 申请 Key 的入口，展示在设置面板说明里 */
+    keysUrl: string;
+}
+
+export const OPENAI_COMPAT_PRESETS: Record<string, OpenAiCompatPreset> = {
+    xai: {
+        label: 'xAI (Grok)',
+        baseUrl: 'https://api.x.ai/v1',
+        keysUrl: 'https://console.x.ai',
+    },
+    zhipu: {
+        label: 'Z.AI (智谱 GLM)',
+        baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+        keysUrl: 'https://open.bigmodel.cn',
+    },
+    qwen: {
+        label: '通义千问 Qwen',
+        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        keysUrl: 'https://bailian.console.aliyun.com',
+    },
+    moonshot: {
+        label: 'Moonshot (Kimi)',
+        baseUrl: 'https://api.moonshot.cn/v1',
+        keysUrl: 'https://platform.moonshot.cn',
+    },
+    groq: {
+        label: 'Groq',
+        baseUrl: 'https://api.groq.com/openai/v1',
+        keysUrl: 'https://console.groq.com/keys',
+    },
+    mistral: {
+        label: 'Mistral',
+        baseUrl: 'https://api.mistral.ai/v1',
+        keysUrl: 'https://console.mistral.ai',
+    },
+    siliconflow: {
+        label: '硅基流动 SiliconFlow',
+        baseUrl: 'https://api.siliconflow.cn/v1',
+        keysUrl: 'https://cloud.siliconflow.cn',
+    },
+};
+
 /** 这些提供商是固定翻译服务，没有模型可选 */
 export function providerHasModelChoice(provider: string): boolean {
-    return ['openai', 'gemini', 'deepseek', 'openrouter', 'customOpenAI', 'customAnthropic'].includes(provider);
+    return ['openai', 'gemini', 'deepseek', 'openrouter', 'customOpenAI', 'customAnthropic'].includes(provider)
+        || provider in OPENAI_COMPAT_PRESETS;
 }
 
 /**
@@ -237,6 +289,11 @@ export async function listModels(
     apiKey: string,
     extras: Record<string, string> = {}
 ): Promise<ModelInfo[]> {
+    const preset = OPENAI_COMPAT_PRESETS[provider];
+    if (preset) {
+        if (!apiKey) { throw new ModelFetchError(`请先填写 ${preset.label} API Key`); }
+        return listCustomOpenAiModels(apiKey, preset.baseUrl);
+    }
     switch (provider) {
         case 'openai':
             return listOpenAiModels(apiKey);

@@ -623,17 +623,21 @@ export class OpenRouterTranslator {
     }
 }
 
-/** 任意 OpenAI 兼容 Chat Completions（含自建代理、Groq、Together 等，仅需 base URL + Key + 模型名） */
+/**
+ * 任意 OpenAI 兼容 Chat Completions（自建代理与 xAI、Groq、Mistral 等预设提供商共用）。
+ * name 可覆盖，用于预设提供商在状态栏/详情里显示自己的名字。
+ */
 export class OpenAICompatibleTranslator {
-    name = 'customOpenAI';
+    name: string;
     private apiKey: string;
     private chatUrl: string;
     private model: string;
 
-    constructor(apiKey?: string, baseUrl?: string, model?: string) {
+    constructor(apiKey?: string, baseUrl?: string, model?: string, name: string = 'customOpenAI') {
         this.apiKey = apiKey || '';
         this.chatUrl = normalizeOpenAiChatCompletionsUrl(baseUrl || 'https://api.openai.com/v1');
         this.model = (model || '').trim();
+        this.name = name;
     }
 
     async translate(text: string, targetLang: string = 'zh-CN', sourceLang: string = 'auto'): Promise<string> {
